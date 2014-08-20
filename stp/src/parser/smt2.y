@@ -65,10 +65,6 @@
     return 1;
   }
 
-  int yyerror(void*, const char*s) {
-    return yyerror(s);
-  }
-
   ASTNode querysmt2;
   vector<ASTVec> assertionsSMT2;
     
@@ -76,9 +72,8 @@
 #define YYMAXDEPTH 104857600
 #define YYERROR_VERBOSE 1
 #define YY_EXIT_FAILURE -1
+#define YYPARSE_PARAM AssertsQuery
   %}
-
-%parse-param {void* AssertsQuery}
 
 %union {  
   unsigned uintval;                  /* for numerals in types. */

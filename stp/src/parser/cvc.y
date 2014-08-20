@@ -22,6 +22,7 @@
 #define YYMAXDEPTH 1048576000
 #define YYERROR_VERBOSE 1
 #define YY_EXIT_FAILURE -1
+#define YYPARSE_PARAM AssertsQuery
   
   extern int cvclex(void);
   extern char* yytext;
@@ -32,13 +33,7 @@
     return YY_EXIT_FAILURE;
   };
   
-  int yyerror(void*, const char *s) {
-    return yyerror(s);
-  };
-
   %}
-
-%parse-param {void* AssertsQuery}
 
 %union {
 

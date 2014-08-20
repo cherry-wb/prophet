@@ -17,11 +17,15 @@ clean:
 
 # Use svnversion to output the global revision number.
 versionString.stamp: FORCE
-	@SVNVERSION=`svnversion -c $(TOP)`; \
-	if [ x`cat $@ 2> /dev/null` != x"$$SVNVERSION" ]; then\
+# hack for compile cherry
+#	@SVNVERSION=`svnversion -c $(TOP)`; \
+#	if [[ ! -e $@ || "x`cat $@ 2> /dev/null`" != "x$$SVNVERSION" ]]; then \
+#		echo $$SVNVERSION > $@; \
+#	fi
+	@SVNVERSION=`echo 2005`; \
+	if [[ ! -e $@ || "x`cat $@ 2> /dev/null`" != "x$$SVNVERSION" ]]; then \
 		echo $$SVNVERSION > $@; \
 	fi
-
 # FIXME: there's some sort of memory error that causes "make regressstp"
 # to fail if version isn't at least 3 characters long.
 versionString.cpp: versionString.stamp
