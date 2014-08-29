@@ -207,6 +207,12 @@ public:
                  const std::vector<klee::ref<klee::Expr> >& /* newConditions */>
             onStateFork;
 
+    /** Signal emitted when the state may fork in taint mode */
+    /*   for taint analysis purpose*/
+    sigc::signal<void, S2EExecutionState* /* currentstate */,
+                 const klee::ref<klee::Expr> & /* condition */>
+            onTaintFork;
+
     sigc::signal<void,
                  S2EExecutionState*, /* currentState */
                  S2EExecutionState*> /* nextState */

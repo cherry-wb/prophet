@@ -69,7 +69,14 @@ PluginsFactory::PluginsFactory()
         registerPlugin(*it);
     }
 }
-
+void PluginsFactory::refresh(){
+	m_pluginsList.clear();
+	m_pluginsMap.clear();
+    CompiledPlugin::CompiledPlugins *plugins = CompiledPlugin::getPlugins();
+    foreach2(it, plugins->begin(), plugins->end()) {
+        registerPlugin(*it);
+    }
+}
 void PluginsFactory::registerPlugin(const PluginInfo* pluginInfo)
 {
     assert(m_pluginsMap.find(pluginInfo->name) == m_pluginsMap.end());

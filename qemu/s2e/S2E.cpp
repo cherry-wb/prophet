@@ -93,6 +93,8 @@ void print_stacktrace(void)
     std::ostream &os = g_s2e->getDebugStream();
     os << "Stack trace printing unsupported on Windows" << '\n';
 }
+void s2e_unload_all_bundle(){
+}
 #else
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,6 +182,128 @@ void print_stacktrace(void)
 
     free(funcname);
     free(symbollist);
+}
+/*
+ * bundle mechanism
+ */
+#include <s2e/bundle_mechanism.h>
+#include <dlfcn.h>
+BundleInfo dbaf_bundles[] ={
+		{ NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	    { NULL,NULL, "" },
+	};
+
+int dbaf_bundles_size =  sizeof(dbaf_bundles) / sizeof(BundleInfo);
+void s2e_load_bundle(const char *plugin_path){
+	bundle_interface_t *(*init_bundle)(void);
+	char *error;
+	BundleInfo* load_bundle = NULL;
+	int loaded = 0;
+	//先比较是否已经加载
+	uint32_t bundlesize=0;
+	int counter = 0;
+	bundlesize = sizeof(dbaf_bundles) / sizeof(BundleInfo);
+	for (counter = 0; counter < bundlesize; counter++) {
+		if(strcmp(dbaf_bundles[counter].bundle_path, plugin_path) == 0){
+			fprintf(stderr, "%s has already been loaded! \n", plugin_path);
+			loaded = 1;
+		}
+	}
+	if(loaded == 0){
+		for (counter = 0; counter < bundlesize; counter++) {
+			if (dbaf_bundles[counter].handle == NULL ) {
+				load_bundle = &(dbaf_bundles[counter]);
+				break;
+			}
+		}
+		load_bundle->handle = dlopen(plugin_path, RTLD_NOW);
+		if (NULL == load_bundle->handle) {
+			char tempbuf[128];
+			strncpy(tempbuf, dlerror(), 127);
+			fprintf(stderr,  "%s\n", tempbuf);
+			fprintf(stderr,  "%s COULD NOT BE LOADED - ERR = [%s]\n", plugin_path,
+					tempbuf);
+			return;
+		}
+		dlerror();
+		init_bundle = (bundle_interface_t *(*)())dlsym(load_bundle->handle, "init_bundle");
+		if ((error = dlerror()) != NULL ) {
+			fprintf(stderr, "%s\n", error);
+			dlclose(load_bundle->handle);
+			load_bundle->handle = NULL;
+			load_bundle->bundle_path[0] = '\0';
+			return;
+		}
+
+		load_bundle->bundle = init_bundle();
+
+		if (NULL == load_bundle->bundle) {
+			fprintf(stderr,  "fail to initialize the bundle!\n");
+			dlclose(load_bundle->handle);
+			load_bundle->handle = NULL;
+			load_bundle->bundle = NULL;
+			load_bundle->bundle_path[0] = '\0';
+			return;
+		}
+		strncpy(load_bundle->bundle_path, plugin_path, PATH_MAX);
+		fprintf(stderr,  "%s is loaded successfully!\n", plugin_path);
+	}
+}
+void s2e_unload_bundle(const char *plugin_path){
+	BundleInfo* load_bundle = NULL;
+	int loaded = 0;
+	uint32_t bundlesize=0;
+	int counter = 0;
+	bundlesize = sizeof(dbaf_bundles) / sizeof(BundleInfo);
+	for (counter = 0; counter < bundlesize; counter++) {
+		if(strcmp(dbaf_bundles[counter].bundle_path, plugin_path) == 0){
+			loaded = 1;
+			load_bundle = &(dbaf_bundles[counter]);
+		}
+	}
+	if(loaded == 1){
+		if(load_bundle->bundle)
+			load_bundle->bundle->bundle_cleanup();
+		if(load_bundle->handle)
+			dlclose(load_bundle->handle);
+		load_bundle->handle = NULL;
+		load_bundle->bundle = NULL;
+
+		monitor_printf(default_mon, "%s is unloaded!\n", load_bundle->bundle_path);
+		load_bundle->bundle_path[0] = '\0';
+
+	}else{
+		monitor_printf(default_mon, "%s is not loaded!\n", plugin_path);
+	}
+	return;
+}
+void s2e_unload_all_bundle(){
+	uint32_t bundlesize=0;
+	int counter = 0;
+	bundlesize = sizeof(dbaf_bundles) / sizeof(BundleInfo);
+	for (counter = 0; counter < bundlesize; counter++) {
+		if(strlen(dbaf_bundles[counter].bundle_path)>5)
+			s2e_unload_bundle(dbaf_bundles[counter].bundle_path);
+	}
+	return;
 }
 #endif //CONFIG_WIN32
 
@@ -530,18 +654,29 @@ void S2E::initPlugins()
             make_pair(m_corePlugin->getPluginInfo()->functionName, m_corePlugin));
 
     vector<string> pluginNames = getConfig()->getStringList("plugins");
-
+    /* bundle mechanism*/
+		foreach(const string& pluginName, pluginNames) {
+			 string pathkey("pluginsConfig."+pluginName+".so_path");
+			 string so_path = getConfig()->getString(pathkey,"");
+			 if(so_path.length() > 2){//加载进内存，如果一个多个插件放在一个so中，则只加载进内存一次
+				s2e_load_bundle(so_path.c_str());
+			 }
+		}
+		m_pluginsFactory->refresh();
+     /* bundle mechanism*/
     /* Check and load plugins */
     foreach(const string& pluginName, pluginNames) {
         const PluginInfo* pluginInfo = m_pluginsFactory->getPluginInfo(pluginName);
         if(!pluginInfo) {
             std::cerr << "ERROR: plugin '" << pluginName
                       << "' does not exist in this S2E installation" << '\n';
+            s2e_unload_all_bundle();
             exit(1);
         } else if(getPlugin(pluginInfo->name)) {
             std::cerr << "ERROR: plugin '" << pluginInfo->name
                       << "' was already loaded "
                       << "(is it enabled multiple times ?)" << '\n';
+            s2e_unload_all_bundle();
             exit(1);
         } else if(!pluginInfo->functionName.empty() &&
                     getPlugin(pluginInfo->functionName)) {
@@ -551,6 +686,7 @@ void S2E::initPlugins()
                       <<  "    this function is already provided by '"
                       << getPlugin(pluginInfo->functionName)->getPluginInfo()->name
                       << "' plugin" << '\n';
+            s2e_unload_all_bundle();
             exit(1);
         } else {
             Plugin* plugin = m_pluginsFactory->createPlugin(this, pluginName);
@@ -797,6 +933,7 @@ void s2e_close(S2E *s2e)
     delete s2e;
     tcg_llvm_close(tcg_llvm_ctx);
     tcg_llvm_ctx = NULL;
+	s2e_unload_all_bundle();
 }
 
 int s2e_is_forking()

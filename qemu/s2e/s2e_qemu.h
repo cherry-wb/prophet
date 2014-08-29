@@ -202,6 +202,10 @@ void s2e_register_ram(struct S2E* s2e,
                       int save_on_context_switch, const char *name);
 
 uintptr_t s2e_get_host_address(target_phys_addr_t paddr);
+/*get guest physical address from host virtual address*/
+target_phys_addr_t s2e_get_ram_address_from_host(void* addr);
+/*get guest virtual address from guest physical address*/
+uint64_t s2e_get_virtual_address_from_physical_address(uint64_t addr, uint64_t _pgd, CPUArchState *env);
 
 int s2e_is_ram_registered(struct S2E* s2e,
                           struct S2EExecutionState *state,

@@ -247,6 +247,11 @@ cl::opt<bool>
 ConcolicMode("use-concolic-execution",
                cl::desc("Concolic execution mode"),  cl::init(true));
 
+//Concolic mode is the default because it works better than symbex.
+cl::opt<bool>
+TaintMode("use-taint-execution",
+               cl::desc("taint execution mode, just as Concolic "),  cl::init(true));
+
 cl::opt<bool>
 DebugConstraints("debug-constraints",
                cl::desc("Check that added constraints are satisfiable"),  cl::init(false));
@@ -886,6 +891,9 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     g_s2e_concretize_io_addresses = ConcretizeIoAddress;
     g_s2e_concretize_io_writes = ConcretizeIoWrites;
 
+    if(TaintMode){
+    	ConcolicMode = TaintMode;
+    }
     concolicMode = ConcolicMode;
 
     if (UseFastHelpers) {
@@ -2072,7 +2080,41 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 
     StatePair res;
 
-    if (ConcolicMode) {
+	if (TaintMode) {
+		condition = simplifyExpr(current, condition);
+		ref<Expr> selectcondition;
+		S2EExecutionState* s2ecurrent =
+				static_cast<S2EExecutionState*>(&current);
+		if (dyn_cast<klee::ConstantExpr>(condition)) {
+			selectcondition = condition;
+			res = Executor::fork(current, condition, isInternal);
+		} else {
+			//Evaluate the expression using the current variable assignment.
+			ref<Expr> evalResult = current.concolics.evaluate(condition);
+			klee::ConstantExpr *ce = dyn_cast<klee::ConstantExpr>(evalResult);
+			assert(ce && "Could not evaluate the expression to a constant.");
+
+			if (ce->isTrue()) {
+				//Condition is true in the current state
+				selectcondition = condition;
+				addConstraint(current, condition);
+				res = StatePair(&current, 0);
+			} else {
+				//Condition is false in the current state
+				selectcondition = Expr::createIsZero(condition);
+				addConstraint(current, selectcondition);
+				res = StatePair(0, &current);
+			}
+			if (VerboseFork) {
+				llvm::raw_ostream& out = m_s2e->getMessagesStream(s2ecurrent);
+				out << "May Fork state " << s2ecurrent->getID() << " at pc = "
+						<< hexval(s2ecurrent->getPc()) << '\n';
+				out << "    state " << s2ecurrent->getID() << " with condition "
+						<< selectcondition << '\n';
+			}
+		   m_s2e->getCorePlugin()->onTaintFork.emit(s2ecurrent, selectcondition);
+		}
+   } else if (ConcolicMode) {
         res = Executor::concolicFork(current, condition, isInternal);
     } else {
         res = Executor::fork(current, condition, isInternal);

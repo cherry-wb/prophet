@@ -4,3 +4,14 @@
 /guest/init_env/init_env*.so
 /guest/s2ecmd/s2ecmd
 /guest/s2eget/s2eget
+/privatebundles
+/qemu/roms/ipxe
+/qemu/roms/openbios
+/qemu/roms/qemu-palcode
+/qemu/roms/seabios
+/qemu/roms/sgabios
+/qemu/roms/SLOF
+/qemu/roms/vgabios
+/stp/.cproject
+/stp/.autotools
+/stp/.directory

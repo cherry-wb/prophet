@@ -292,6 +292,7 @@ sdl_config="${SDL_CONFIG-${cross_prefix}sdl-config}"
 CFLAGS="-g $CFLAGS"
 CXXFLAGS="-Wno-mismatched-tags -g $CXXFLAGS"
 LDFLAGS="-g $LDFLAGS"
+LDFLAGS="-rdynamic"
 
 QEMU_CFLAGS="-fno-strict-aliasing $QEMU_CFLAGS"
 QEMU_CFLAGS="-Wall -Wundef -Wwrite-strings -Wmissing-prototypes $QEMU_CFLAGS"

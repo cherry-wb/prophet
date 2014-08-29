@@ -26,6 +26,7 @@
 									<listOptionValue builtIn="false" value="/home/wb/work/build/llvm3.2/llvm-3.2.src/include"/>
 									<listOptionValue builtIn="false" value="/home/wb/work/build/llvm3.2/llvm-3.2.src.native/tools/clang/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/lua5.1"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/prophet/qemu}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1148705331" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -35,6 +36,7 @@
 									<listOptionValue builtIn="false" value="/home/wb/work/build/llvm3.2/llvm-3.2.src/include"/>
 									<listOptionValue builtIn="false" value="/home/wb/work/build/llvm3.2/llvm-3.2.src.native/tools/clang/include"/>
 									<listOptionValue builtIn="false" value="/usr/include/lua5.1"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/prophet/qemu}&quot;"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.1318381910" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
 							</tool>

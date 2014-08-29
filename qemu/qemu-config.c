@@ -612,7 +612,18 @@ QemuOptsList qemu_boot_opts = {
         { /*End of list */ }
     },
 };
-
+static QemuOptsList qemu_s2ecmd_opts = {
+    .name = "s2ecmd",
+    .implied_opt_name = "type",
+    .head = QTAILQ_HEAD_INITIALIZER(qemu_netdev_opts.head),
+    .desc = {
+        /*
+         * no elements => accept any params
+         * validation will happen later
+         */
+        { /* end of list */ }
+    },
+};
 static QemuOptsList *vm_config_groups[32] = {
     &qemu_drive_opts,
     &qemu_chardev_opts,
@@ -628,6 +639,7 @@ static QemuOptsList *vm_config_groups[32] = {
     &qemu_machine_opts,
     &qemu_boot_opts,
     &qemu_iscsi_opts,
+    &qemu_s2ecmd_opts,
     NULL,
 };
 

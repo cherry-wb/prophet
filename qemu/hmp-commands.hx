@@ -1420,3 +1420,15 @@ ETEXI
 STEXI
 @end table
 ETEXI
+
+#ifdef CONFIG_S2E
+    {
+        .name       = "s2e-exec",
+        .args_type  = "s2ecmd:O",
+        .params     = "type=str[,prop=value][,...]",
+        .help       = "send monitor command to plugins.",
+        .user_print = monitor_user_noop,
+        .mhandler.cmd_new = qmp_s2e_exec,
+    },
+#endif
+

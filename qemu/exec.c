@@ -2321,7 +2321,56 @@ uintptr_t s2e_get_host_address(target_phys_addr_t paddr)
     return (uintptr_t)memory_region_get_ram_ptr(section->mr)
             + section_addr(section, paddr);
 }
-
+target_phys_addr_t s2e_get_ram_address_from_host(void* addr)
+{
+    return qemu_ram_addr_from_host_nofail(addr);
+}
+uint64_t s2e_get_virtual_address_from_physical_address(uint64_t addr, uint64_t _pgd, CPUArchState *env) {
+	uint64_t retaddr = (uint64_t)-1;
+	#if defined(TARGET_I386)
+	unsigned int l1, l2;
+	uint32_t pgd, pde, pte;
+	target_phys_addr_t targetphysicaladdr = addr & ~0xfff;
+	target_phys_addr_t virtualaddr;
+	target_phys_addr_t physicaladdr;
+	target_phys_addr_t _pte;
+	target_phys_addr_t _mask;
+	pgd = _pgd & ~0xfff;
+	for(l1 = 0; l1 < 1024; l1++) {
+		cpu_physical_memory_read(pgd + l1 * 4, &pde, 4);
+		pde = le32_to_cpu(pde);
+		if (pde & PG_PRESENT_MASK) {
+			if ((pde & PG_PSE_MASK) && (env->cr[4] & CR4_PSE_MASK)) {
+				/* 4M pages */
+				_pte = pde;
+				_mask = ~((1 << 21) - 1);
+				physicaladdr = _pte & _mask;
+				virtualaddr = (l1 << 22);
+				if(targetphysicaladdr == physicaladdr) {
+					retaddr = virtualaddr + (addr & 0xfff);
+					return retaddr;
+				}
+			} else {
+				for(l2 = 0; l2 < 1024; l2++) {
+					cpu_physical_memory_read((pde & ~0xfff) + l2 * 4, &pte, 4);
+					pte = le32_to_cpu(pte);
+					if (pte & PG_PRESENT_MASK) {
+						_pte = pte & ~PG_PSE_MASK;
+						_mask = ~0xfff;
+						physicaladdr = _pte & _mask;
+						virtualaddr = (l1 << 22) + (l2 << 12);
+						if(targetphysicaladdr == physicaladdr) {
+							retaddr = virtualaddr + (addr & 0xfff);
+							return retaddr;
+						}
+					}
+				}
+			}
+		}
+	}
+	#endif
+	return retaddr;
+}
 #endif
 
 /* Add a new TLB entry. At most one entry for a given virtual address

@@ -141,7 +141,8 @@ public:
     PluginsFactory();
 
     void registerPlugin(const PluginInfo* pluginInfo);
-
+    /*bundle mechanism*/
+     void refresh();
     const std::vector<const PluginInfo*> &getPluginInfoList() const;
     const PluginInfo* getPluginInfo(const std::string& name) const;
 
@@ -164,7 +165,13 @@ public:
         }
         s_compiledPlugins->insert(info);
     }
-
+    /*bundle mechanism*/
+      static void removePlugin(const PluginInfo * plg) {
+      	 if (s_compiledPlugins) {
+      		 if(s_compiledPlugins->find(plg) != s_compiledPlugins->end())
+      		 	 s_compiledPlugins->erase(plg);
+      	 }
+       }
     static CompiledPlugins* getPlugins() {
         return s_compiledPlugins;
     }
