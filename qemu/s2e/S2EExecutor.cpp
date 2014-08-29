@@ -619,6 +619,22 @@ void S2EExecutor::handleGetValue(klee::Executor* executor,
     s2eState->kleeReadMemory(kleeAddress, sizeInBytes, NULL, false, true, add_constraint);
 }
 
+void S2EExecutor::handleEipCorrupt(Executor* executor,
+                                   ExecutionState* state,
+                                   klee::KInstruction* target,
+                                   std::vector< ref<Expr> > &args)
+{
+    S2EExecutor* s2eExecutor = static_cast<S2EExecutor*>(executor);
+    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+
+    assert(args.size() == 1);
+    ref<Expr> address = args[0];
+
+    if (!isa<klee::ConstantExpr>(address)) {
+        s2eExecutor->m_s2e->getCorePlugin()->onEipCorrupt.emit(s2eState, address);
+    }
+}
+
 S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
                     const InterpreterOptions &opts,
                             InterpreterHandler *ie)
@@ -867,6 +883,14 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
         assert(function);
         addSpecialFunctionHandler(function, handleGetValue);
 
+        vector<llvm::Type*> params;
+        params.push_back(IntegerType::get(M->getContext(), 64));
+        FunctionType *eipCorruptTy = FunctionType::get(
+                llvm::Type::getVoidTy(M->getContext()), params, false);
+        function = dynamic_cast<Function*>(kmodule->module->getOrInsertFunction(
+                "tcg_llvm_eip_corrupt", eipCorruptTy));
+        assert(function);
+        addSpecialFunctionHandler(function, handleEipCorrupt);
 
         FunctionType *traceInstTy = FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
         function = dynamic_cast<Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
@@ -1938,6 +1962,8 @@ uintptr_t S2EExecutor::executeTranslationBlock(
         //XXX: adapt scaling dynamically.
         int slowdown = UseFastHelpers ? ClockSlowDownFastHelpers : ClockSlowDown;
         cpu_enable_scaling(slowdown);
+
+        m_s2e->getCorePlugin()->onKleeExecutionStart.emit(state);
 
         return executeTranslationBlockKlee(state, tb);
 
