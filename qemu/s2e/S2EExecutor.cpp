@@ -250,7 +250,7 @@ ConcolicMode("use-concolic-execution",
 //Concolic mode is the default because it works better than symbex.
 cl::opt<bool>
 TaintMode("use-taint-execution",
-               cl::desc("taint execution mode, just as Concolic "),  cl::init(true));
+               cl::desc("taint execution mode, just as Concolic "),  cl::init(false));
 
 cl::opt<bool>
 DebugConstraints("debug-constraints",
