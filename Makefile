@@ -142,7 +142,7 @@ CLANG_CXX=$(LLVMBUILD)/llvm-native/Release/bin/clang++
 
 ifeq ($(LLVMBUILD),$(S2EBUILD))
 LLVM_CONFIGURE_FLAGS = --prefix=$(S2EBUILD)/opt \
-                       --enable-jit --enable-optimized \
+                       --enable-jit --enable-optimized --enable-shared \
 
 #First build it with the system's compiler
 stamps/llvm-native-configure: $(CLANG_DEST_DIR) $(COMPILER_RT_DEST_DIR)
