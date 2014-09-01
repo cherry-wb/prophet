@@ -55,6 +55,9 @@ QEMUPutLEDEntry *qemu_add_led_event_handler(QEMUPutLEDEvent *func, void *opaque)
 void qemu_remove_led_event_handler(QEMUPutLEDEntry *entry);
 
 void kbd_put_keycode(int keycode);
+
+void s2e_grab_end(void);
+
 void kbd_put_ledstate(int ledstate);
 void kbd_mouse_event(int dx, int dy, int dz, int buttons_state);
 
@@ -369,7 +372,10 @@ void qemu_console_copy(DisplayState *ds, int src_x, int src_y,
 
 /* sdl.c */
 void sdl_display_init(DisplayState *ds, int full_screen, int no_frame);
-
+#ifdef CONFIG_SDL
+void sdl_grab_end_nonstatic(void);
+extern void s2e_keyboard_shortcut(int key);
+#endif
 /* cocoa.m */
 void cocoa_display_init(DisplayState *ds, int full_screen);
 

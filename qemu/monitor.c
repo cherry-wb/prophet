@@ -75,6 +75,10 @@
 
 #ifdef CONFIG_S2E
 #include <s2e/s2e_qemu.h>
+#else
+void s2e_keyboard_shortcut(int key){
+
+}
 #endif
 
 //#define DEBUG

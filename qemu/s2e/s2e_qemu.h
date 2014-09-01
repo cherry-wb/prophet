@@ -333,6 +333,8 @@ void s2e_on_page_directory_change(uint64_t previous, uint64_t current);
 void s2e_on_initialization_complete(void);
 
 void s2e_on_monitor_event(struct QDict *ret);
+/*add a shortcut for s2e,by this way we can interupt s2e on demond.*/
+void s2e_keyboard_shortcut(int key);
 
 int s2e_is_load_balancing(void);
 int s2e_is_forking(void);

@@ -276,3 +276,11 @@ void qemu_remove_mouse_mode_change_notifier(Notifier *notify)
 {
     notifier_remove(notify);
 }
+
+void s2e_grab_end(){
+
+#ifdef CONFIG_SDL
+	sdl_grab_end_nonstatic();
+#endif
+	return;
+}

@@ -330,6 +330,23 @@ public:
                 S2EExecutionState *>
           onKleeExecutionStart;
 
+    /*
+     *  Signal emitted when a vuln is detected
+     */
+    sigc::signal<void,
+                    S2EExecutionState* /* current state */,
+                    std::string /* type*/,
+                    std::string /* message */>
+    onVulnFound;
+    /*
+     *when we want to send some message back to control script, we emitt this Signal .
+     */
+    sigc::signal<void,
+                    S2EExecutionState* /* current state */,
+                    std::string /* cmd */,
+                    std::string /* message */>
+    onNotifyMessage;
+
 };
 
 } // namespace s2e

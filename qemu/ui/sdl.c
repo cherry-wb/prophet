@@ -607,6 +607,10 @@ static void handle_keydown(DisplayState *ds, SDL_Event *ev)
             toggle_full_screen(ds);
             gui_keysym = 1;
             break;
+        case 0x10: /* 'q' key on US keyboard */
+        	  s2e_keyboard_shortcut(0x10);
+              gui_keysym = 1;
+             break;
         case 0x16: /* 'u' key on US keyboard */
             if (scaling_active) {
                 scaling_active = 0;
@@ -1048,4 +1052,7 @@ void sdl_display_init(DisplayState *ds, int full_screen, int no_frame)
     sdl_cursor_normal = SDL_GetCursor();
 
     atexit(sdl_cleanup);
+}
+void sdl_grab_end_nonstatic(void){
+	sdl_grab_end();
 }
