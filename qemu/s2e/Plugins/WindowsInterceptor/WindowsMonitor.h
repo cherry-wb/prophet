@@ -224,7 +224,7 @@ public:
     bool isCheckedBuild() const {
         return s_checkedMap[m_Version];
     }
-
+    virtual bool isKernelMode() const;
     virtual bool isKernelAddress(uint64_t pc) const;
     virtual uint64_t getPid(S2EExecutionState *s, uint64_t pc);
     virtual bool getCurrentStack(S2EExecutionState *s, uint64_t *base, uint64_t *size);

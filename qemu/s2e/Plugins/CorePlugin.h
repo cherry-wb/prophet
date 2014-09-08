@@ -346,7 +346,10 @@ public:
                     std::string /* cmd */,
                     std::string /* message */>
     onNotifyMessage;
-
+    /**
+         * S2E finished all states.
+     */
+    sigc::signal<void>  onAllStateKilled;
 };
 
 } // namespace s2e

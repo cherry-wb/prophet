@@ -84,8 +84,12 @@ void X86FunctionMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
                                       TranslationBlock *tb,
                                       uint64_t pc, bool, uint64_t)
 {
+	bool isimporttable = false;
+	if((tb->s2e_tb_type == TB_JMP || tb->s2e_tb_type == TB_JMP_IND) && (pc == tb->pc)){
+		isimporttable = true;
+	}
     /* We intercept all call and ret translation blocks */
-    if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND) {
+    if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND || isimporttable) {
         signal->connect(sigc::mem_fun(*this,
                             &X86FunctionMonitor::slotCall));
     }

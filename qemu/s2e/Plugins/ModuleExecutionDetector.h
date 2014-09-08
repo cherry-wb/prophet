@@ -198,7 +198,7 @@ private:
 
     void processUnloadListener(
         S2EExecutionState* state,
-        uint64_t pid);
+        const  ProcessDescriptor &pd);
 
 public:
     ModuleExecutionDetector(S2E* s2e): Plugin(s2e) {}

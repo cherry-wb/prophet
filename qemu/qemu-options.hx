@@ -30,6 +30,10 @@ ETEXI
 #ifdef CONFIG_S2E
 DEF("s2e-config-file", HAS_ARG, QEMU_OPTION_s2e_config_file,
     "s2e-config-file   file      Path to S2E configuration file\n", QEMU_ARCH_ALL)
+DEF("s2e-node-type", HAS_ARG, QEMU_OPTION_s2e_node_type,
+    "s2e-node-type   string      S2E'node type (master or task) \n", QEMU_ARCH_ALL)
+DEF("s2e-node-id", HAS_ARG, QEMU_OPTION_s2e_node_id,
+    "s2e-node-id   string      S2E'node id \n", QEMU_ARCH_ALL)
 DEF("s2e-output-dir", HAS_ARG, QEMU_OPTION_s2e_output_dir,
     "s2e-output-dir    dir       Path to S2E output directory\n", QEMU_ARCH_ALL)
 DEF("s2e-max-processes", HAS_ARG, QEMU_OPTION_s2e_max_processes,

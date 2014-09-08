@@ -251,6 +251,10 @@ BitfieldSimplifier::ExprBitsInfo BitfieldSimplifier::doSimplifyBits(
     case Expr::Concat:
         {
             uint64_t shift = kids[1]->getWidth();
+            if(shift>=64){ //cherry start
+			   rbits.knownOneBits = 0;
+			   rbits.knownZeroBits = zeroMask(e->getWidth());
+		   }else{ //cherry end
             rbits.knownOneBits = (bits[0].knownOneBits << shift) |
                                  bits[1].knownOneBits;
             rbits.knownZeroBits = (bits[0].knownZeroBits << shift)
@@ -261,6 +265,7 @@ BitfieldSimplifier::ExprBitsInfo BitfieldSimplifier::doSimplifyBits(
                                   | zeroMask(kids[0]->getWidth());
             bits[1].ignoredBits = ignoredBits
                                   | zeroMask(kids[1]->getWidth());
+		   } //cherry
         }
         break;
 

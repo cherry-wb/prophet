@@ -254,6 +254,7 @@ int nb_option_roms;
 int semihosting_enabled = 0;
 int old_param = 0;
 const char *qemu_name;
+const char *g_s2e_node_id;
 int alt_grab = 0;
 int ctrl_grab = 0;
 unsigned int nb_prom_envs = 0;
@@ -2330,9 +2331,11 @@ int main(int argc, char **argv, char **envp)
     const char *loadvm = NULL;
     QEMUMachine *machine;
     const char *cpu_model;
-
+    g_s2e_node_id = NULL;
 #ifdef CONFIG_S2E
     const char *s2e_config_file = NULL;
+    const char *s2e_node_type = NULL;
+    const char *s2e_node_id = NULL;
     const char *s2e_output_dir = NULL;
     int execute_always_klee = 0;
     int s2e_verbose = 0;
@@ -2465,6 +2468,13 @@ int main(int argc, char **argv, char **envp)
             case QEMU_OPTION_s2e_config_file:
               s2e_config_file = optarg;
               break;
+            case QEMU_OPTION_s2e_node_type:
+			   s2e_node_type = optarg;
+			   break;
+            case QEMU_OPTION_s2e_node_id:
+			   s2e_node_id = optarg;
+			   g_s2e_node_id = optarg;
+			   break;
             case QEMU_OPTION_s2e_output_dir:
               s2e_output_dir = optarg;
               break;
@@ -3434,9 +3444,11 @@ int main(int argc, char **argv, char **envp)
       fprintf(stderr, "Warning: S2E configuration file was not specified, "
                         "using the default (empty) file\n");
     }
+    if (!s2e_node_type) {  }
+   if (!s2e_node_id) {  }
     g_s2e = s2e_initialize(argc, argv, tcg_llvm_ctx,
                            s2e_config_file, s2e_output_dir,
-                           s2e_verbose, s2e_max_processes);
+                           s2e_verbose, s2e_max_processes,s2e_node_type,s2e_node_id);
 
     g_s2e_state = s2e_create_initial_state(g_s2e);
 

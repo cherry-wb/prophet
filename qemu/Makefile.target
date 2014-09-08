@@ -576,9 +576,9 @@ ARLIBS += libs2e.a
 
 s2e_llvmobj-y =
 s2e_llvmobj-y += op_helper.bc
-
+s2e_llvmobj-y += fpu/softfloat.bc
 op_helper.bc: QEMU_CFLAGS+=-Wno-unused-function
-
+fpu/softfloat.bc: QEMU_CFLAGS+=-Wno-unused-function
 $(s2e_llvmobj-y): %.bc: %.c %.o $(GENERATED_HEADERS)
 
 #libs2e_llvm.bca: $(s2e_llvmobj-y)

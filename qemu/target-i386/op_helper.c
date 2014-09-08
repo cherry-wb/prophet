@@ -1799,6 +1799,13 @@ void raise_exception_err_env(CPUX86State *nenv, int exception_index,
 
 static void QEMU_NORETURN raise_exception(int exception_index)
 {
+#ifdef CONFIG_S2E
+    if (EXCP00_DIVZ == exception_index)
+    {
+     s2e_debug_print("Exception: div 0!");
+     s2e_dump_testcase(g_s2e, g_s2e_state);
+    }
+#endif
     raise_interrupt(exception_index, 0, 0, 0);
 }
 

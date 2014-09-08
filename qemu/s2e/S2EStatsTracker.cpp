@@ -199,7 +199,34 @@ void S2EStatsTracker::writeStatsLine() {
              << ")\n";
   statsFile->flush();
 }
+std::string S2EStatsTracker::getS2EStatsTrackerData(){
+	std::stringstream ss;
 
+	 ss << "'当前状态数量'="<< executor.getStatesCount()<<",\n"
+	 << "'查询次数'="<< stats::queries <<",\n"
+	// << "'NumQueryConstructs'="<< stats::queryConstructs <<",\n"
+	// << "'NumObjects'="<< 0 <<",\n"
+	 //<< "'CoveredInstructions',\n"
+	 //<< "'UncoveredInstructions',\n"
+	 << "'基本块数量'="<< stats::translationBlocks <<",\n"
+	 << "'真实执行的基本块数量'="<< stats::translationBlocksConcrete <<",\n"
+	 << "'符号执行的基本块数量'="<<  stats::translationBlocksKlee <<",\n"
+	 << "'指令数量'="<< stats::cpuInstructions <<",\n"
+	 << "'真实指令数量'="<< stats::cpuInstructionsConcrete <<",\n"
+	 << "'符号化执行指令数量'="<< stats::cpuInstructionsKlee <<",\n"
+	 << "'真实执行模式耗时'="<< stats::concreteModeTime / 1000000 <<",\n"
+	 << "'符号执行模式耗时'="<< stats::symbolicModeTime / 1000000 <<",\n"
+	 //<< "'UserTime'="<<  util::getUserTime() <<",\n"
+	 //<< "'WallTime'="<< elapsed() <<",\n"
+	 << "'查询时间'="<< stats::queryTime / 1000000 <<",\n"
+	 << "'求解时间'="<< stats::solverTime / 1000000 <<",\n"
+	// << "'CexCacheTime'="<< stats::cexCacheTime / 1000000 <<",\n"
+	// << "'ForkTime'="<<  stats::forkTime / 1000000 <<",\n"
+	// << "'ResolveTime'="<< stats::resolveTime / 1000000 <<",\n"
+	 << "'内存使用'="<< getProcessMemoryUsage() <<",\n"
+	 << "\n";
+	return ss.str();
+}
 S2EStateStats::S2EStateStats():
     m_statTranslationBlockConcrete(0),
     m_statTranslationBlockSymbolic(0),

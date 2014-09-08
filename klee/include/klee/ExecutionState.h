@@ -65,6 +65,12 @@ struct StackFrame {
 class ExecutionState {
   friend class AddressSpace;
 
+  //cherry start
+public:
+  bool m_shouldbedeleted; // cherry while in replay mode,this is used as  mark for delete.
+  typedef std::pair<ConstraintManager,ref<Expr> > CEPair;
+  CEPair m_symbolicaddress;
+  //cherry end
 public:
   typedef std::vector<StackFrame> stack_ty;
 
@@ -122,7 +128,7 @@ private:
                      addressSpace(this), ptreeNode(0) {}
 
 protected:
-  virtual ExecutionState* clone();
+  virtual ExecutionState* clone(bool cestatus = false);
   virtual void addressSpaceChange(const MemoryObject *mo,
                                   const ObjectState *oldState,
                                   ObjectState *newState);
@@ -136,7 +142,7 @@ public:
 
   virtual ~ExecutionState();
   
-  ExecutionState *branch();
+  ExecutionState *branch(bool cestatus = false);
 
   void pushFrame(KInstIterator caller, KFunction *kf);
   void popFrame();

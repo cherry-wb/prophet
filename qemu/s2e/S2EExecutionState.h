@@ -43,7 +43,8 @@
 #include "S2EStatsTracker.h"
 #include "MemoryCache.h"
 #include "s2e_config.h"
-
+#include <set>
+#include <deque>
 /** S2E_TARGET_CONC_LIMIT defines the border between concrete and symbolic area.
  *  Eg. regs[15] is in concrete-only-area for ARM targets.
  *  This is often used as a CPUArchState offset, see CPU_CONC_LIMIT below.
@@ -109,6 +110,17 @@ struct S2EPhysCacheEntry
 
 class S2EExecutionState : public klee::ExecutionState
 {
+public:
+	 std::deque<bool> m_forkdecision;
+	 std::deque<bool> m_forkrecord;
+	 std::deque<bool> m_forkrecord4repaly;
+    //是否正在重播，当m_forkrecord4repaly变为空时，请将其设为false
+    bool m_replaying;
+    bool m_allowserialize;
+    bool m_forcetoadd;
+    std::string m_statefilename;
+    typedef std::set<std::pair<uint64_t,uint64_t> > OSPageNeedToSwap;
+    OSPageNeedToSwap m_OSPageNeedToSwap;
 protected:
     friend class S2EExecutor;
 
@@ -193,7 +205,7 @@ protected:
     /** Set when execution enters doInterrupt, reset when it exits. */
     bool m_runningExceptionEmulationCode;
 
-    ExecutionState* clone();
+    ExecutionState* clone(bool cestatus = false);
     void addressSpaceChange(const klee::MemoryObject *mo,
                             const klee::ObjectState *oldState,
                             klee::ObjectState *newState);
@@ -204,7 +216,7 @@ public:
     enum AddressType {
         VirtualAddress, PhysicalAddress, HostAddress
     };
-
+    S2EExecutionState* getCopy();
     S2EExecutionState(klee::KFunction *kf);
     ~S2EExecutionState();
 

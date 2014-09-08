@@ -99,10 +99,66 @@ void s2e_tcg_execution_handler(void* signal, uint64_t pc)
 {
     try {
         ExecutionSignal *s = (ExecutionSignal*)signal;
+        if((pc >= g_s2e->getExecuteWatchStart()&&pc <= g_s2e->getExecuteWatchEnd())){
+				std::stringstream message;
+				message << "executing pc :" << hexval(pc) << "\n";
+				message << "basic info dump.\n";
+				message << "CPU dump" << '\n';
+	#ifdef TARGET_I386
+				message << "EAX="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_EAX]), klee::Expr::Int32) << '\n';
+				message << "EBX="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_EBX]), klee::Expr::Int32) << '\n';
+				message << "ECX="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_ECX]), klee::Expr::Int32) << '\n';
+				message << "EDX="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_EDX]), klee::Expr::Int32) << '\n';
+				message << "ESI="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_ESI]), klee::Expr::Int32) << '\n';
+				message << "EDI="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_EDI]), klee::Expr::Int32) << '\n';
+				message << "EBP="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_EBP]), klee::Expr::Int32) << '\n';
+				message << "ESP="
+						<< g_s2e_state->readCpuRegister(offsetof(CPUX86State, regs[R_ESP]), klee::Expr::Int32) << '\n';
+				message << "EIP=" << g_s2e_state->readCpuState(offsetof(CPUX86State, eip),32) << '\n';
+				message << "CR2="
+						<< g_s2e_state->readCpuState(offsetof(CPUX86State, cr[2]), 32) <<'\n';
+	#endif
+
+				uint32_t sp = g_s2e_state->getSp();
+				message << "Dumping stack @0x" << std::hex << sp << '\n';
+				for (unsigned i = 0; i < 10; ++i) {
+					klee::ref<klee::Expr> val = g_s2e_state->readMemory(
+							sp + i * sizeof(uint32_t), klee::Expr::Int32);
+					if (!val.isNull()) {
+						try {
+							klee::ConstantExpr *ce = dyn_cast<klee::ConstantExpr>(
+									val);
+							if (ce) {
+								message << std::hex << "0x"
+										<< sp + i * sizeof(uint32_t) << " 0x"
+										<< std::setw(sizeof(uint32_t) * 2)
+										<< std::setfill('0') << val;
+								message << std::setfill(' ');
+							} else {
+								message << std::hex << "0x"
+										<< sp + i * sizeof(uint32_t) << val;
+							}
+						} catch (...) {
+						}
+						message << '\n';
+					}
+				}
+				g_s2e->getCorePlugin()->onNotifyMessage.emit(g_s2e_state,"executestart",message.str());
+        }
         if (g_s2e_enable_signals) {
             s->emit(g_s2e_state, pc);
         }
-    } catch(s2e::CpuExitException&) {
+    } catch(s2e::CpuExitException& ex) {
+    	if((ex.reason==1) && ex.virtualAddress!=0){
+    		ldub_code(ex.virtualAddress);
+    	}
         s2e_longjmp(env->jmp_env, 1);
     }
 }

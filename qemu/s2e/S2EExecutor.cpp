@@ -546,9 +546,12 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
     klee::ref<klee::Expr> concreteAddress;
 
     if (ConcolicMode) {
+    	  //为了获取符号化的地址，我们将这里的address保存到当前的state中，以便于出现内存访问或其他需要的时候拿到未具体化的符号地址用于分析。
+		state->m_symbolicaddress = make_pair(state->constraints, address);
         concreteAddress = state->concolics.evaluate(address);
         assert(dyn_cast<klee::ConstantExpr>(concreteAddress) && "Could not evaluate address");
     } else {
+    	state->m_symbolicaddress = make_pair(state->constraints, address);
         //Not in concolic mode, will have to invoke the constraint solver
         //to compute a concrete value
         klee::ref<klee::ConstantExpr> value;
@@ -720,7 +723,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     __DEFINE_EXT_FUNCTION(tb_find_pc)
 
     __DEFINE_EXT_FUNCTION(qemu_system_reset_request)
-
+    __DEFINE_EXT_FUNCTION(s2e_dump_testcase)
     __DEFINE_EXT_FUNCTION(tlb_flush_page)
     __DEFINE_EXT_FUNCTION(tlb_flush)
 
@@ -952,7 +955,33 @@ S2EExecutor::~S2EExecutor()
     if(statsTracker)
         statsTracker->done();
 }
+S2EExecutionState* S2EExecutor::createInitialState4Deserialize() {
 
+	/**/
+	S2EExecutionState *state = g_s2e_ini_state->getCopy(); //CHECK cherry
+	//s2e_init_device_state(state);
+	//initializeExecution(state, m_executeAlwaysKlee);
+	//registerDirtyMask(state,m_registerDirtyMask_host_address,m_registerDirtyMask_size);
+
+	state->m_stateID = g_s2e->fetchAndIncrementStateId();
+	state->coveredNew = false;
+	state->coveredLines.clear();
+	state->concolics.clear();
+
+	state->m_runningConcrete = false;
+	state->m_active = false;
+	processTree = new PTree(state);
+	state->ptreeNode = processTree->root;
+
+	processTree->activate(state->ptreeNode);
+	states.insert(state);
+	std::set<ExecutionState*> tmp;
+	tmp.insert(state);
+	state->m_forcetoadd = true;
+	searcher->update(0, tmp, std::set<ExecutionState*>());
+
+		return state;
+}
 S2EExecutionState* S2EExecutor::createInitialState()
 {
     assert(!processTree);
@@ -1503,6 +1532,7 @@ ExecutionState* S2EExecutor::selectNonSpeculativeState(S2EExecutionState *state)
 
     if (!newState) {
         m_s2e->getWarningsStream() << "All states were terminated" << '\n';
+        g_s2e->getCorePlugin()->onAllStateKilled.emit();
         foreach(S2EExecutionState* s, m_deletedStates) {
             //Leave the current state in a zombie form to let QEMU exit gracefully.
             if (s != g_s2e_state) {
@@ -1557,9 +1587,15 @@ S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
 
     if(newState != state) {
         g_s2e->getCorePlugin()->onStateSwitch.emit(state, newState);
-        vm_stop(RUN_STATE_SAVE_VM);
-        doStateSwitch(state, newState);
-        vm_start();
+        if(!newState->m_replaying){
+			vm_stop(RUN_STATE_SAVE_VM);
+			doStateSwitch(state, newState);
+			vm_start();
+		}else{
+			vm_stop(RUN_STATE_SAVE_VM);
+			doStateSwitch(state, newState);
+			vm_start();
+		}
     }
 
     //We can't free the state immediately if it is the current state.
@@ -1672,7 +1708,10 @@ inline bool S2EExecutor::executeInstructions(S2EExecutionState *state, unsigned 
                 return true;
             }
         }
-    } catch (CpuExitException &) {
+    } catch(s2e::CpuExitException& ex) {
+    	if(ex.reason==1 && ex.virtualAddress!=0){
+    		ldub_code(ex.virtualAddress);
+    	}
         assert(addedStates.empty());
         return true;
     }
@@ -1718,7 +1757,9 @@ bool S2EExecutor::finalizeTranslationBlockExec(S2EExecutionState *state)
     if (VerboseTbFinalize) {
         m_s2e->getDebugStream(state) << "Done finalizing TB execution\n";
     }
-
+    if(!ret){
+		m_s2e->getDebugStream(state) << "There is something wrong.. \n";
+	}
     return ret;
 }
 
@@ -2141,7 +2182,45 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 		   m_s2e->getCorePlugin()->onTaintFork.emit(s2ecurrent, selectcondition);
 		}
    } else if (ConcolicMode) {
+	   bool currentce = false;
+	   S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(&current);
+	   if (!isa<klee::ConstantExpr>(condition)) {
+		   if (s2eState->m_replaying) { //回放只是用来选择状态用的
+				currentce = s2eState->m_forkrecord4repaly.front();
+				s2eState->m_forkrecord4repaly.pop_front();
+			}
+	   }
         res = Executor::concolicFork(current, condition, isInternal);
+        if (s2eState->m_replaying) { //回放只是用来选择状态用的
+			if (res.first && res.second) {
+				if (currentce) {
+					res.second->m_shouldbedeleted = true;
+				}
+				if (!currentce) {
+					res.first->m_shouldbedeleted = true;
+				}
+				if (res.second) {
+					S2EExecutionState* s2esecond =
+							static_cast<S2EExecutionState*>(res.second);
+					if (s2esecond->m_forkrecord4repaly.size() == 0) {
+						s2esecond->m_replaying = false;
+						s2esecond->m_forkrecord4repaly = std::deque<bool>(
+								s2esecond->m_forkrecord);
+						s2esecond->m_allowserialize = false;
+					}
+				}
+				if (res.first) {
+					S2EExecutionState* s2efirst =
+							static_cast<S2EExecutionState*>(res.first);
+					if (s2efirst->m_forkrecord4repaly.size() == 0) {
+						s2efirst->m_replaying = false;
+						s2efirst->m_forkrecord4repaly = std::deque<bool>(
+								s2efirst->m_forkrecord);
+						s2efirst->m_allowserialize = false;
+					}
+				}
+			}
+		}
     } else {
         res = Executor::fork(current, condition, isInternal);
     }
@@ -2165,7 +2244,9 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
     }
     return res;
 }
-
+void S2EExecutor::notifyBranchPub(ExecutionState &state){
+	notifyBranch(state);
+}
 /**
  * Called from klee::Executor when the engine is about to fork
  * the current state.
@@ -2720,7 +2801,39 @@ void helper_register_symbol(const char *name, void *address)
 {
     llvm::sys::DynamicLibrary::AddSymbol(name, address);
 }
+void s2e_dump_testcase(S2E *s2e,S2EExecutionState *state) {
+	//TODO 只能检测一个异常？
+	std::stringstream err;
+	err << "StateID:" << state->getID()	 << "div-zero:BUG:检测到除0漏洞."<< std::endl;
+	s2e->getCorePlugin()->onVulnFound.emit(state,"div-zero",err.str());
+	s2e->getDebugStream() << err.str() << "\n";
+	s2e->getWarningsStream() << "process div-zero TestCase of state "
+			<< state->getID() << " at address " << hexval(state->getPc())
+			<< '\n';
 
+	typedef std::pair<std::string, std::vector<unsigned char> > VarValuePair;
+	typedef std::vector<VarValuePair> ConcreteInputs;
+	ConcreteInputs out;
+	bool success = s2e->getExecutor()->getSymbolicSolution(*state, out);
+	if (!success) {
+		s2e->getWarningsStream() << "Could not get symbolic solutions" << '\n';
+		return;
+	}
+	s2e->getWarningsStream() << '\n';
+	std::stringstream ss;
+	ConcreteInputs::iterator it;
+	for (it = out.begin(); it != out.end(); ++it) {
+		const VarValuePair &vp = *it;
+		ss << vp.first << ": ";
+		for (unsigned i = 0; i < vp.second.size(); ++i) {
+			ss << std::setw(2) << std::setfill('0') << (unsigned) vp.second[i]
+					<< ' '
+					<< (vp.second[i] >= 0x20 ? (char) vp.second[i] : ' ');
+		}
+		ss << std::setfill(' ') << '\n';
+	}
+	s2e->getWarningsStream() << ss.str();
+}
 #ifdef S2E_DEBUG_MEMORY
 #ifdef __linux__
 

@@ -227,6 +227,7 @@ public:
   void write8(unsigned offset, uint8_t value);
   void write16(unsigned offset, uint16_t value);
   void write32(unsigned offset, uint32_t value);
+  void write48(unsigned offset, uint64_t value);//cherry floatextend
   void write64(unsigned offset, uint64_t value);
 
   bool isAllConcrete() const;

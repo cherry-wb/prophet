@@ -96,6 +96,7 @@ public:
   static const Width Int8 = 8;
   static const Width Int16 = 16;
   static const Width Int32 = 32;
+  static const Width Int48 = 48;
   static const Width Int64 = 64;
   
 
@@ -184,6 +185,8 @@ public:
 
   /// dump - Print the expression to stderr.
   void dump() const;
+
+  std::string getstring() const;
 
   /// Returns the pre-computed hash of the current expression
   virtual unsigned hash() const { return hashValue; }
@@ -346,7 +349,7 @@ public:
   ///
   /// This routine should be used in situations where the width of the constant
   /// is known to be limited to a certain number of bits.
-  uint64_t getZExtValue(unsigned bits = 64) const {
+  uint64_t getZExtValue(unsigned bits = 128) const {
     assert(getWidth() <= bits && "Value may be out of range!");
     return value.getZExtValue();
   }

@@ -532,6 +532,7 @@ void ObjectState::write(unsigned offset, ref<Expr> value) {
       case  Expr::Int8:  write8(offset, val); return;
       case Expr::Int16: write16(offset, val); return;
       case Expr::Int32: write32(offset, val); return;
+      case Expr::Int48: write48(offset, val); return;//cherry floatextend
       case Expr::Int64: write64(offset, val); return;
       }
     }
@@ -567,6 +568,14 @@ void ObjectState::write32(unsigned offset, uint32_t value) {
     unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
     write8(offset + idx, (uint8_t) (value >> (8 * i)));
   }
+}
+//cherry floatextend
+void ObjectState::write48(unsigned offset, uint64_t value) {
+    unsigned NumBytes = 6;
+    for (unsigned i = 0; i != NumBytes; ++i) {
+        unsigned idx = Context::get().isLittleEndian() ? i : (NumBytes - i - 1);
+        write8(offset + idx, (uint8_t) (value >> (8 * i)));
+    }
 }
 
 void ObjectState::write64(unsigned offset, uint64_t value) {

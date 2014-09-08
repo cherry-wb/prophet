@@ -62,7 +62,7 @@ StackFrame::~StackFrame() {
 /***/
 
 ExecutionState::ExecutionState(KFunction *kf) 
-  : fakeState(false),
+  : m_shouldbedeleted(false),fakeState(false),
     underConstrained(false),
     depth(0),
     pc(kf->instructions),
@@ -77,10 +77,12 @@ ExecutionState::ExecutionState(KFunction *kf)
     concolics(true),
     speculative(false){
   pushFrame(0, kf);
+  //不能放到上面，因为this本身还未初始化，那么this->constraints就是个未知数，用于构造pair时导致size无穷大出错。
+  m_symbolicaddress = std::make_pair(this->constraints,klee::ConstantExpr::create(0, klee::Expr::Int32));
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions) 
-  : fakeState(true),
+  : m_shouldbedeleted(false),fakeState(true),
     underConstrained(false),
     constraints(assumptions),
     queryCost(0.),
@@ -88,13 +90,15 @@ ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
     ptreeNode(0),
     concolics(true),
     speculative(false) {
+	//不能放到上面，因为this本身还未初始化，那么this->constraints就是个未知数，用于构造pair时导致size无穷大出错。
+	m_symbolicaddress = std::make_pair(this->constraints,klee::ConstantExpr::create(0, klee::Expr::Int32));
 }
 
 ExecutionState::~ExecutionState() {
   while (!stack.empty()) popFrame();
 }
 
-ExecutionState* ExecutionState::clone() {
+ExecutionState* ExecutionState::clone(bool cestatus) {
   ExecutionState* state = new ExecutionState(*this);
   state->addressSpace.state = state;
   return state;
@@ -104,10 +108,10 @@ void ExecutionState::addressSpaceChange(const MemoryObject*,
                                         const ObjectState*, ObjectState*) {
 }
 
-ExecutionState *ExecutionState::branch() {
+ExecutionState *ExecutionState::branch(bool cestatus) {
   depth++;
 
-  ExecutionState *falseState = clone();
+  ExecutionState *falseState = clone(cestatus);
   falseState->coveredNew = false;
   falseState->coveredLines.clear();
 

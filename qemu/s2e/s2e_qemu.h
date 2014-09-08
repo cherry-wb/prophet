@@ -70,6 +70,7 @@ extern struct S2E* g_s2e;
 struct PCIBus;
 /* This should never be accessed from C++ code */
 extern struct S2EExecutionState* g_s2e_state;
+extern struct S2EExecutionState* g_s2e_ini_state;
 
 /**************************/
 /* Functions from S2E.cpp */
@@ -79,7 +80,7 @@ struct S2E* s2e_initialize(int argc, char** argv,
                            struct TCGLLVMContext *tcgLLVMContext,
                            const char *s2e_config_file,
                            const char *s2e_output_dir,
-                           int verbose, unsigned max_processes);
+                           int verbose, unsigned max_processes, const char *s2e_node_type,const char *s2e_node_id);
 
 /** Relese S2E instance and all S2E-related objects. Called by main() */
 void s2e_close(struct S2E* s2e);
@@ -293,6 +294,7 @@ int s2e_is_runnable(struct S2EExecutionState* state);
 void s2e_dump_state(void);
 
 void s2e_execute_cmd(const char *cmd);
+void s2e_dump_testcase(struct S2E *s2e, struct S2EExecutionState *state);//cherry
 
 void s2e_on_device_registration(struct S2E *s2e);
 void s2e_on_device_activation(struct S2E *s2e, int bus_type, void *bus);

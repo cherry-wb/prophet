@@ -335,13 +335,13 @@ void ModuleExecutionDetector::moduleUnloadListener(
 
 
 void ModuleExecutionDetector::processUnloadListener(
-    S2EExecutionState* state, uint64_t pid)
+    S2EExecutionState* state, const  ProcessDescriptor &pd)
 {
     DECLARE_PLUGINSTATE(ModuleTransitionState, state);
 
-    s2e()->getDebugStream() << "Process " << hexval(pid) << " is unloaded\n";
+    s2e()->getDebugStream() << "Process " << hexval(pd.pid) << " is unloaded\n";
 
-    plgState->unloadDescriptorsWithPid(pid);
+    plgState->unloadDescriptorsWithPid(pd.pid);
 }
 
 

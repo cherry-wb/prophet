@@ -103,10 +103,12 @@ void s2e_init_device_state(S2EExecutionState *s)
 S2EDeviceState::S2EDeviceState(const S2EDeviceState &state):
         m_deviceState(state.m_deviceState)
 {
+	if (state.m_stateBuffer) {
     assert( state.m_stateBuffer && s_finalStateSize > 0);
     m_stateBuffer = (uint8_t*) malloc(s_finalStateSize);
     memcpy(m_stateBuffer, state.m_stateBuffer, s_finalStateSize);
     s_memFile = state.s_memFile;
+	}
 }
 
 S2EDeviceState::S2EDeviceState(klee::ExecutionState *state):m_deviceState(state)
@@ -118,7 +120,12 @@ S2EDeviceState::S2EDeviceState(klee::ExecutionState *state):m_deviceState(state)
 S2EDeviceState::~S2EDeviceState()
 {
     if (m_stateBuffer) {
-        free(m_stateBuffer);
+    	try {
+			 free(m_stateBuffer);
+			 m_stateBuffer = NULL;
+		} catch (...) {
+			 m_stateBuffer = NULL;
+		}
     }
 }
 
@@ -126,7 +133,7 @@ void S2EDeviceState::initDeviceState()
 {
     m_stateBuffer = NULL;
     
-    assert(!s_devicesInited);
+    s_devicesInited = false;
 
     s_memFile = qemu_memfile_open(s2e_qemu_get_buffer, s2e_qemu_put_buffer);
 
@@ -219,8 +226,9 @@ void S2EDeviceState::initFirstSnapshot()
 
 void S2EDeviceState::restoreDeviceState()
 {
-    assert(s_finalStateSize && m_stateBuffer);
-
+	if (!(s_finalStateSize && m_stateBuffer)) {
+			qemu_make_readable(s_memFile);
+	} else {
     qemu_make_readable(s_memFile);
     //DPRINTF("Restoring device state %p\n", this);
     for (vector<void*>::iterator it = s_devices.begin(); it != s_devices.end(); it++) {
@@ -229,6 +237,7 @@ void S2EDeviceState::restoreDeviceState()
         s2e_qemu_load_state(s_memFile, se);
     }
     //DPRINTF("\n");
+	}
 }
 
 

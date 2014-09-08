@@ -415,14 +415,16 @@ static void sdl_update_caption(void)
         else
             status = " - Press Ctrl-Alt to exit mouse grab";
     }
-
-    if (qemu_name) {
-        snprintf(win_title, sizeof(win_title), "S2E (%s)%s", qemu_name, status);
-        snprintf(icon_title, sizeof(icon_title), "S2E (%s)", qemu_name);
-    } else {
-        snprintf(win_title, sizeof(win_title), "S2E%s", status);
-        snprintf(icon_title, sizeof(icon_title), "S2E");
+    if(g_s2e_node_id==NULL){
+    	g_s2e_node_id = "MasterNode";
     }
+	if (qemu_name) {
+		snprintf(win_title, sizeof(win_title), "%s-S2E (%s)%s", g_s2e_node_id,qemu_name, status);
+		snprintf(icon_title, sizeof(icon_title), "%s-S2E (%s)",  g_s2e_node_id,qemu_name);
+	} else {
+		snprintf(win_title, sizeof(win_title), "%s-S2E%s", g_s2e_node_id, status);
+		snprintf(icon_title, sizeof(icon_title), "%s-S2E" ,g_s2e_node_id);
+	}
 
     SDL_WM_SetCaption(win_title, icon_title);
 }

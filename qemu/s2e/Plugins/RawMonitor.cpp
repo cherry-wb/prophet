@@ -104,6 +104,9 @@ bool RawMonitor::initSection(const std::string &cfgKey, const std::string &svcId
     }
 
     cfg.kernelMode = s2e()->getConfig()->getBool(cfgKey + ".kernelmode", false, &ok);
+    if(cfg.kernelMode){
+    	m_KernelMode = true;
+    }
     if (!ok) {
         s2e()->getWarningsStream() << "You must specify " << cfgKey <<  ".kernelmode\n";
         return false;
@@ -118,7 +121,7 @@ void RawMonitor::initialize()
     std::vector<std::string> Sections;
     Sections = s2e()->getConfig()->getListKeys(getConfigKey());
     bool noErrors = true;
-
+    m_KernelMode = false;
     bool ok = false;
     m_kernelStart = s2e()->getConfig()->getInt(getConfigKey() + ".kernelStart", 0xc0000000, &ok);
     if (!ok) {
@@ -354,7 +357,9 @@ void RawMonitor::onTranslateInstructionStart(ExecutionSignal *signal,
     m_onTranslateInstruction.disconnect();
 }
 
-
+bool RawMonitor::isKernelMode() const{
+	return m_KernelMode;
+}
 bool RawMonitor::getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I)
 {
     I = m_imports;
@@ -377,4 +382,9 @@ uint64_t RawMonitor::getPid(S2EExecutionState *s, uint64_t pc)
         return 0;
     }
     return s->getPid();
+}
+uint64_t RawMonitor::getCurrentThread(S2EExecutionState *state)
+{
+    //未实现
+    return 0;
 }

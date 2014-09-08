@@ -314,7 +314,7 @@ using namespace std;
 
 S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     const std::string &configFileName, const std::string &outputDirectory,
-    int verbose, unsigned s2e_max_processes)
+    const std::string &nodetype, const std::string &nodeid,int verbose, unsigned s2e_max_processes)
         : m_tcgLLVMContext(tcgLLVMContext)
 {
     if (s2e_max_processes < 1) {
@@ -338,10 +338,18 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     m_startTimeSeconds = llvm::sys::TimeValue::now().seconds();
 
     m_forking = false;
+    m_node_type = nodetype;
+    m_node_id = nodeid;
 
     m_maxProcesses = s2e_max_processes;
     m_currentProcessIndex = 0;
     m_currentProcessId = 0;
+    m_plugininied = false;
+    m_TranslateWatchStart = (uint64_t)-1;
+    m_ExecuteWatchStart =  (uint64_t)-1;
+    m_TranslateWatchEnd = (uint64_t)-1;
+    m_ExecuteWatchEnd =  (uint64_t)-1;
+
     S2EShared *shared = m_sync.acquire();
     shared->currentProcessCount = 1;
     shared->lastStateId = 0;
@@ -349,6 +357,9 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     shared->processIds[m_currentProcessId] = m_currentProcessIndex;
     shared->processPids[m_currentProcessId] = getpid();
     m_sync.release();
+
+    /* Parse configuration file */
+    m_configFile = new s2e::ConfigFile(configFileName);
 
     /* Open output directory. Do it at the very beginning so that
        other init* functions can use it. */
@@ -369,15 +380,25 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     {
         llvm::raw_ostream *out = openOutputFile("s2e.cmdline");
         for(int i = 0; i < argc; ++i) {
-            if(i != 0)
-                (*out) << " ";
-            (*out) << "'" << argv[i] << "'";
+			if(i != 0)
+			{
+				(*out) << " ";
+				m_cmdline << " ";
+			}
+			std::string arg = std::string (argv[i]);
+
+			if(arg.find(std::string("s2e-node-id"))!= std::string::npos){
+				++i;// 跳过s2e-node-id参数
+			}else if(arg.find(std::string("gnome-terminal"))!= std::string::npos){
+				++i;
+			}else{
+				(*out) << "'" << argv[i] << "'";
+				 m_cmdline << "'" << argv[i] << "'";
+			}
         }
         delete out;
     }
 
-    /* Parse configuration file */
-    m_configFile = new s2e::ConfigFile(configFileName);
 
     /* Initialize KLEE command line options */
     initKleeOptions();
@@ -484,6 +505,16 @@ llvm::raw_ostream* S2E::openOutputFile(const std::string &fileName)
 
 void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool forked)
 {
+		//可以在系统暂停时，将未完成状态序列化保存到文件（定义一个约定的共享文件）
+		//下次启动时自动，在config中加载上次未完成的任务
+		std::string outputfolderid = m_configFile->getString("pluginsConfig.currentNodeID");
+	    m_TranslateWatchStart =m_configFile->getInt("pluginsConfig.translateWatchStart",(uint64_t)-1);
+	    m_ExecuteWatchStart =m_configFile->getInt("pluginsConfig.executeWatchStart",(uint64_t)-1);
+	    m_TranslateWatchEnd =m_configFile->getInt("pluginsConfig.translateWatchEnd",(uint64_t)-1);
+	    m_ExecuteWatchEnd =m_configFile->getInt("pluginsConfig.executeWatchEnd",(uint64_t)-1);
+	    if(m_node_id.length()>0){
+			outputfolderid = m_node_id;
+		}
     if (!forked) {
         //In case we create the first S2E process
         if (outputDirectory.empty()) {
@@ -491,7 +522,7 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
 
             for (int i = 0; ; i++) {
                 ostringstream dirName;
-                dirName << "s2e-out-" << i;
+                dirName << "s2e-out-" <<outputfolderid<<"-"<< i;
 
                 llvm::sys::Path dirPath(cwd);
                 dirPath.appendComponent(dirName.str());
@@ -536,7 +567,18 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
 
     llvm::sys::Path outDir(m_outputDirectory);
     std::string mkdirError;
-
+    //检测共享目录是否存在，不存在就创建一个，否则跳过 //cherry 取m_outputDirectory的字串，剔除（-i）
+    m_shareDirectory = m_outputDirectory.substr(0,m_outputDirectory.find_last_of('-'));
+    llvm::sys::Path shareDir(m_shareDirectory);
+    std::string mksharedirError;
+#ifdef _WIN32
+    if (shareDir.createDirectoryOnDisk(false, &mksharedirError)) {
+#else
+    if (shareDir.createDirectoryOnDisk(true, &mksharedirError)) {
+#endif
+        std::cerr << "Could not create share directory " << shareDir.str() <<
+                " error: " << mksharedirError << '\n';
+    }
 #ifdef _WIN32
     //XXX: If set to true on Windows, it fails when parent directories exist
     //For now, we assume that only the last component needs to be created
@@ -717,6 +759,7 @@ void S2E::initPlugins()
     foreach(Plugin* p, m_activePluginsList) {
         p->initialize();
     }
+    m_plugininied = true;
 }
 
 void S2E::initExecutor()
@@ -918,12 +961,12 @@ S2E* g_s2e = NULL;
 S2E* s2e_initialize(int argc, char** argv,
             TCGLLVMContext* tcgLLVMContext,
             const char* s2e_config_file,  const char* s2e_output_dir,
-            int verbose, unsigned s2e_max_processes)
+            int verbose, unsigned s2e_max_processes,const char *s2e_node_type,const char *s2e_node_id)
 {
     return new S2E(argc, argv, tcgLLVMContext,
                    s2e_config_file ? s2e_config_file : "",
                    s2e_output_dir  ? s2e_output_dir  : "",
-                   verbose, s2e_max_processes);
+                   s2e_node_type ? s2e_node_type : "master",s2e_node_id?s2e_node_id:"", verbose, s2e_max_processes);
 }
 
 void s2e_close(S2E *s2e)

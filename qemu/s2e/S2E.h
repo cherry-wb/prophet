@@ -48,6 +48,8 @@
 #include "s2e_config.h"
 #include "Plugin.h"
 #include "Synchronization.h"
+#include <string>
+#include <sstream>
 
 namespace klee {
     class Interpreter;
@@ -105,6 +107,7 @@ protected:
     ActivePluginsMap m_activePluginsMap;
 
     std::string m_outputDirectory;
+    std::string m_shareDirectory;
 
     llvm::raw_ostream*   m_infoFileRaw;
     llvm::raw_ostream*   m_debugFileRaw;
@@ -114,6 +117,16 @@ protected:
     llvm::raw_ostream*   m_messageStream;
     llvm::raw_ostream*   m_warningStream;
 
+    std::stringstream m_cmdline;
+    std::string m_node_type;
+
+   std::string m_node_id;
+   uint64_t m_TranslateWatchStart;
+   uint64_t m_ExecuteWatchStart;
+   uint64_t m_TranslateWatchEnd;
+   uint64_t m_ExecuteWatchEnd;
+
+   bool m_plugininied;
 
     TCGLLVMContext *m_tcgLLVMContext;
 
@@ -153,6 +166,8 @@ public:
                  TCGLLVMContext* tcgLLVMContext,
                  const std::string& configFileName,
                  const std::string& outputDirectory,
+                 const std::string &nodetype,
+                 const std::string &nodeid,
                  int verbose = 0, unsigned s2e_max_processes = 1);
     ~S2E();
 
@@ -240,6 +255,50 @@ public:
     inline uint64_t getStartTime() const {
         return m_startTimeSeconds;
     }
+    const std::string& getShareDirectory() const { return m_shareDirectory; }
+    const std::stringstream& getCmdline() const {
+    		return m_cmdline;
+    	}
+
+    	const std::string& getNodeType() const {
+    		return m_node_type;
+    	}
+    	void setNodeType(std::string& nodetype) {
+    		 m_node_type = nodetype;
+    	}
+
+    	const std::string& getNodeId() const {
+    		return m_node_id;
+    	}
+    	uint64_t getExecuteWatchStart() const {
+    		return m_ExecuteWatchStart;
+    	}
+
+    	uint64_t getTranslateWatchStart() const {
+    		return m_TranslateWatchStart;
+    	}
+    	void setExecuteWatchStart(uint64_t ExecuteWatchStart)  {
+    		m_ExecuteWatchStart = ExecuteWatchStart;
+    	}
+
+    	void setTranslateWatchStart(uint64_t TranslateWatchStart)  {
+    		m_TranslateWatchStart = TranslateWatchStart;
+    	}
+    	uint64_t getExecuteWatchEnd() const {
+    		return m_ExecuteWatchEnd;
+    	}
+
+    	void setExecuteWatchEnd(uint64_t executeWatchEnd) {
+    		m_ExecuteWatchEnd = executeWatchEnd;
+    	}
+
+    	uint64_t getTranslateWatchEnd() const {
+    		return m_TranslateWatchEnd;
+    	}
+
+    	void setTranslateWatchEnd(uint64_t translateWatchEnd) {
+    		m_TranslateWatchEnd = translateWatchEnd;
+    	}
 
 };
 

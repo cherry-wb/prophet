@@ -41,9 +41,22 @@
 #include <s2e/S2EExecutionState.h>
 #include "ModuleDescriptor.h"
 #include "ThreadDescriptor.h"
+#include "ProcessDescriptor.h"
 
 namespace s2e {
 namespace plugins {
+
+struct Range {
+	uint64_t start;
+	uint64_t end;
+	bool operator()(const Range &p1, const Range &p2) const {
+		return p1.start < p2.start;
+	}
+	bool operator==(const Range &p1) const {
+		return p1.start == start && p1.end == end;
+	}
+};
+typedef std::set<Range, Range> RangeEntries;
 
 /**
  *  Base class for default OS actions.
@@ -63,7 +76,7 @@ public:
    >onModuleLoad;
 
    sigc::signal<void, S2EExecutionState*, const ModuleDescriptor &> onModuleUnload;
-   sigc::signal<void, S2EExecutionState*, uint64_t> onProcessUnload;
+   sigc::signal<void, S2EExecutionState*, const ProcessDescriptor &> onProcessUnload;
 
    sigc::signal<void, S2EExecutionState*, const ThreadDescriptor&> onThreadCreate;
    sigc::signal<void, S2EExecutionState*, const ThreadDescriptor&> onThreadExit;
@@ -74,7 +87,9 @@ public:
    virtual bool getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I) = 0;
    virtual bool getExports(S2EExecutionState *s, const ModuleDescriptor &desc, Exports &E) = 0;
    virtual bool isKernelAddress(uint64_t pc) const = 0;
+   virtual bool isKernelMode() const = 0;
    virtual uint64_t getPid(S2EExecutionState *s, uint64_t pc) = 0;
+   virtual uint64_t getCurrentThread(S2EExecutionState *state) = 0;
    virtual bool getCurrentStack(S2EExecutionState *s, uint64_t *base, uint64_t *size) = 0;
 
    bool isOnTheStack(S2EExecutionState *s, uint64_t address) {

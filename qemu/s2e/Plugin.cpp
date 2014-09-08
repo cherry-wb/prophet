@@ -40,6 +40,11 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <string>
+#include <vector>
+#include <map>
+#include <set>
+#include <iostream>
 
 namespace s2e {
 
@@ -50,7 +55,17 @@ CompiledPlugin::CompiledPlugins* CompiledPlugin::s_compiledPlugins = NULL;
 void Plugin::initialize()
 {
 }
+const std::string& Plugin::getNodeID(){
+	if(m_nodeID.length()>0){
 
+	}else{
+		m_nodeID = s2e()->getConfig()->getString("pluginsConfig.currentNodeID");
+		if(s2e()->getNodeId().length()>0){
+			m_nodeID = s2e()->getNodeId();
+		}
+	}
+	return m_nodeID;
+}
 PluginState *Plugin::getPluginState(S2EExecutionState *s, PluginStateFactory f) const
 {
     if (m_CachedPluginS2EState == s) {

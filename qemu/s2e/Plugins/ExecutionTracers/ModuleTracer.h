@@ -81,7 +81,7 @@ protected:
 
     void processUnloadListener(
         S2EExecutionState* state,
-        uint64_t pid);
+        const  ProcessDescriptor &pd);
 
 
 

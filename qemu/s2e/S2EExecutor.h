@@ -39,7 +39,7 @@
 #include <klee/Executor.h>
 #include <llvm/Support/raw_ostream.h>
 #include <cpu.h>
-
+#include <s2e/S2EStatsTracker.h>
 class TCGLLVMContext;
 
 struct TranslationBlock;
@@ -57,6 +57,18 @@ struct S2ETranslationBlock;
 
 class CpuExitException
 {
+	public:
+	CpuExitException(){
+		reason = 0;
+		virtualAddress = 0;
+	}
+	CpuExitException(int _reason,uint64_t _virtualAddress){
+		reason = _reason;
+		virtualAddress = _virtualAddress;
+	}
+public:
+	int reason;
+	uint64_t virtualAddress;
 };
 
 /** Handler required for KLEE interpreter */
@@ -125,10 +137,13 @@ public:
     virtual ~S2EExecutor();
 
     void flushTb();
-
+    std::string getS2EStatsTrackerData(){
+    	s2e::S2EStatsTracker *s2estatsTracker = 	dynamic_cast<s2e::S2EStatsTracker*>(statsTracker);
+    	return s2estatsTracker->getS2EStatsTrackerData();
+    }
     /** Create initial execution state */
     S2EExecutionState* createInitialState();
-
+    S2EExecutionState* createInitialState4Deserialize();
     /** Called from QEMU before entering main loop */
     void initializeExecution(S2EExecutionState *initialState,
                              bool executeAlwaysKlee);
@@ -176,8 +191,12 @@ public:
     void updateStates(klee::ExecutionState *current) {
         klee::Executor::updateStates(current);
     }
-
-
+    void insert(klee::ExecutionState *es) {
+        states.insert(es);
+    }
+    void insertAddedStates(klee::ExecutionState *state) {
+      addedStates.insert(state);
+    }
     void setCCOpEflags(S2EExecutionState *state);
 #ifdef TARGET_ARM
     void doInterrupt(S2EExecutionState *state);
@@ -231,7 +250,15 @@ public:
     const S2EExecutionState* getYieldedState() {
         return yieldedState;
     }
-
+public:
+    void notifyBranchPub(klee::ExecutionState &state); //cherry
+    bool isStateExist(klee::ExecutionState* state){
+    	if (states.find(state) != states.end()) {
+			return true;
+		}else{
+			return false;
+		}
+    }
 protected:
     static void handlerTraceMemoryAccess(klee::Executor* executor,
                                     klee::ExecutionState* state,

@@ -849,7 +849,7 @@ Executor::concolicFork(ExecutionState &current, ref<Expr> condition, bool isInte
     notifyBranch(current);
 
     ExecutionState *trueState, *falseState, *branchedState;
-    branchedState = current.branch();
+    branchedState = current.branch(ce->isTrue());
     addedStates.insert(branchedState);
 
     branchedState->speculative = true;

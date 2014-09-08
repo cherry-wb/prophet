@@ -100,6 +100,7 @@ bool X86ExceptionInterceptor::initializeExceptionHandlers(S2EExecutionState *sta
     }
 
     //Register the relevant exception handlers
+    registerHandler(state, DIVIDE_ZERO);
     registerHandler(state, DOUBLE_FAULT);
     registerHandler(state, STACK_FAULT);
     registerHandler(state, GPF);
@@ -199,6 +200,9 @@ void X86ExceptionInterceptor::onExecuteBlockStart(S2EExecutionState *state, uint
     const Handler &h = *it;
 
     switch(h.idtVector) {
+    	case DIVIDE_ZERO:
+        		s2e()->getMessagesStream() << "Divide zero fault\n";
+        		break;
         case GPF:
             s2e()->getMessagesStream() << "General protection fault\n";
             break;

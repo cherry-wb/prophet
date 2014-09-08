@@ -264,7 +264,14 @@ bool WindowsUmInterceptor::CatchProcessTerminationXp(S2EExecutionState *State)
 
     s2e_debug_print("Process %#"PRIx32" %16s unloaded\n", EProcess.Pcb.DirectoryTableBase,
         EProcess.ImageFileName);
-    m_Os->onProcessUnload.emit(State, EProcess.Pcb.DirectoryTableBase);
+    ProcessDescriptor pd;
+	pd.pid= EProcess.Pcb.DirectoryTableBase;
+	char d[32];
+	sprintf(d,"%s",EProcess.ImageFileName);
+	std::string ccc(d);
+	transform(ccc.begin(),ccc.end(),ccc.begin(),tolower);
+	pd.Name=ccc;
+	m_Os->onProcessUnload.emit(State, pd);
 
     return true;
 }
@@ -293,7 +300,14 @@ bool WindowsUmInterceptor::CatchProcessTerminationServer2008(S2EExecutionState *
 
     s2e_debug_print("Process %#"PRIx32" %16s unloaded\n", EProcess.Pcb.DirectoryTableBase,
         EProcess.ImageFileName);
-    m_Os->onProcessUnload.emit(State, EProcess.Pcb.DirectoryTableBase);
+    ProcessDescriptor pd;
+   pd.pid= EProcess.Pcb.DirectoryTableBase;
+   char d[32];
+   	sprintf(d,"%s",EProcess.ImageFileName);
+   	std::string ccc(d);
+   	transform(ccc.begin(),ccc.end(),ccc.begin(),tolower);
+   	pd.Name=ccc;
+   m_Os->onProcessUnload.emit(State, pd);
 
     return true;
 }

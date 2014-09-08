@@ -92,7 +92,7 @@ private:
     sigc::connection m_onTranslateInstruction;
 
     uint64_t m_kernelStart;
-
+    bool m_KernelMode;
     Imports m_imports;
 
     bool initSection(const std::string &cfgKey, const std::string &svcId);
@@ -112,12 +112,12 @@ public:
                                      S2EExecutionState *state,
                                      TranslationBlock *tb,
                                      uint64_t pc);
-
+    virtual bool isKernelMode() const;
     virtual bool getImports(S2EExecutionState *s, const ModuleDescriptor &desc, Imports &I);
     virtual bool getExports(S2EExecutionState *s, const ModuleDescriptor &desc, Exports &E);
     virtual bool isKernelAddress(uint64_t pc) const;
     virtual uint64_t getPid(S2EExecutionState *s, uint64_t pc);
-
+    virtual uint64_t getCurrentThread(S2EExecutionState *state);
     virtual bool getCurrentStack(S2EExecutionState *state, uint64_t *base, uint64_t *size) {
         return false;
     }

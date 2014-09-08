@@ -639,7 +639,9 @@ uint64_t WindowsMonitor::GetKeTerminateThread() const
     uint64_t offset = GetKernelLoadBase() - s_kernelNativeBase[m_Version];
     return s_ntKeTerminateThread[m_Version] + offset;
 }
-
+bool WindowsMonitor::isKernelMode() const{
+	return m_KernelMode;
+}
 bool WindowsMonitor::isKernelAddress(uint64_t pc) const
 {
     //XXX: deal with large address space awareness

@@ -465,6 +465,7 @@ static inline void gen_op_jmp_T0(DisasContext *s)
     tcg_gen_st_tl(cpu_T[0], cpu_env, offsetof(CPUX86State, eip));
     #ifdef CONFIG_S2E
     s2e_translate_compute_reg_mask_end(s);
+    gen_instr_end(s);//cherry
     s2e_on_translate_block_end(g_s2e, g_s2e_state,
                                s->tb, s->insPc, 0, 0);
     #endif
@@ -674,6 +675,7 @@ static inline void gen_jmp_im(DisasContext *s, target_ulong pc)
     /* gen_eob may come after gototb, so we need to instrument here ! */
     if (s->enable_jmp_im) {
         s2e_translate_compute_reg_mask_end(s);
+        gen_instr_end(s);//cherry
         s2e_on_translate_block_end(g_s2e, g_s2e_state,
                                    s->tb, s->insPc, 1, pc);
     }
@@ -8047,6 +8049,11 @@ static inline void gen_intermediate_code_internal(CPUX86State *env,
         if (dc->is_jmp) {
             break;
         }
+        //cherry size 和 icont 在跳转前就已经不变了
+		   if (!search_pc) {
+			   tb->size = pc_ptr - pc_start;
+			   tb->icount = num_insns;
+		   }
         /* if single step mode, we generate only one instruction and
            generate an exception */
         /* if irq were inhibited with HF_INHIBIT_IRQ_MASK, we clear

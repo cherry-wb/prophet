@@ -44,6 +44,7 @@ namespace s2e {
 namespace plugins {
 
 enum EX86Exceptions {
+    DIVIDE_ZERO = 0,
     DOUBLE_FAULT=8,
     STACK_FAULT=12,
     GPF=13

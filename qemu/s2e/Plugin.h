@@ -42,7 +42,7 @@
 #include <map>
 #include <set>
 #include <s2e/Signals/Signals.h>
-
+#include <s2e/ConfigFile.h>
 namespace s2e {
 
 class S2E;
@@ -56,7 +56,7 @@ private:
 protected:
     mutable PluginState *m_CachedPluginState;
     mutable S2EExecutionState *m_CachedPluginS2EState;
-
+    std::string m_nodeID;
 public:
     Plugin(S2E* s2e) : m_s2e(s2e),m_CachedPluginState(NULL),
         m_CachedPluginS2EState(NULL) {}
@@ -76,7 +76,7 @@ public:
 
     /** Return configuration key for this plugin */
     const std::string& getConfigKey() const;
-
+    const std::string& getNodeID();
     PluginState *getPluginState(S2EExecutionState *s, PluginState* (*f)(Plugin *, S2EExecutionState *)) const;
 
     void refresh() {
