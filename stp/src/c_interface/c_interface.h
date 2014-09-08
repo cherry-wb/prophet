@@ -48,7 +48,10 @@ extern "C" {
   // h  : help
   // s  : stats
   // v  : print nodes
+
+  // The "num_absrefine" argument isn't used at all. It's left for compatibility with existing code.
   void vc_setFlags(VC vc, char c, int num_absrefine _CVCL_DEFAULT_ARG(0));
+  void vc_setFlag(VC vc, char c);
 
   //! Interface-only flags.
   enum ifaceflag_t {
@@ -65,6 +68,10 @@ extern "C" {
 
   };
   void vc_setInterfaceFlags(VC vc, enum ifaceflag_t f, int param_value);
+
+  // defines division by zero to equal 1, x%0 to equal x.
+  // avoids division by zero errors.
+  void make_division_total(VC vc);
 
   //! Flags can be NULL
   VC vc_createValidityChecker(void);
@@ -144,8 +151,6 @@ extern "C" {
   //! Prints 'e' to stdout.
   void vc_printExpr(VC vc, Expr e);
 
-  void vc_printExprStream(void *stream, VC vc, Expr e);
-
   //! Prints 'e' to stdout as C code
   void vc_printExprCCode(VC vc, Expr e);
 
@@ -200,19 +205,28 @@ extern "C" {
 
   //! Assert a new formula in the current context.
   /*! The formula must have Boolean type. */
-  void vc_assertFormula(VC vc, Expr e, int absrefine_bucket_num _CVCL_DEFAULT_ARG(0));
+  void vc_assertFormula(VC vc, Expr e);
 
   //! Simplify e with respect to the current context
   Expr vc_simplify(VC vc, Expr e);
 
   //! Check validity of e in the current context. e must be a FORMULA
-  //
-  //if returned 0 then input is INVALID.
-  //
-  //if returned 1 then input is VALID
-  //
-  //if returned 2 then ERROR
+  //returns 0 -> the input is INVALID
+  //returns 1 -> the input is VALID
+  //returns 2 -> then ERROR
+  //returns 3 -> then TIMEOUT
+
+  // NB. The timeout is a soft timeout, use the -g flag for a hard timeout that
+  // will abort automatically. The soft timeout is checked sometimes in the code,
+  // and if the time has passed, then "timeout" will be returned. It's only checked
+  // sometimes though, so the actual timeout may be larger. Cryptominisat doesn't check
+  // the timeout yet..
+
+  // The C-language doesn't allow default arguments, so to get it compiling, I've split
+  // it into two functions.
+  int vc_query_with_timeout(VC vc, Expr e, int timeout_ms);
   int vc_query(VC vc, Expr e);
+
 
   //! Return the counterexample after a failed query.
   Expr vc_getCounterExample(VC vc, Expr e);
@@ -265,6 +279,7 @@ extern "C" {
   Expr vc_sbvDivExpr(VC vc, int n_bits, Expr left, Expr right);
   // signed left modulo right i.e. left%right
   Expr vc_sbvModExpr(VC vc, int n_bits, Expr left, Expr right);
+  Expr vc_sbvRemExpr(VC vc, int n_bits, Expr left, Expr right);
 
   Expr vc_bvLtExpr(VC vc, Expr left, Expr right);
   Expr vc_bvLeExpr(VC vc, Expr left, Expr right);
@@ -284,6 +299,12 @@ extern "C" {
   Expr vc_bvXorExpr(VC vc, Expr left, Expr right);
   Expr vc_bvNotExpr(VC vc, Expr child);
 
+  // Shift an expression by another expression. This is newstyle.
+  Expr vc_bvLeftShiftExprExpr(VC vc, int n_bits, Expr left, Expr right);
+  Expr vc_bvRightShiftExprExpr(VC vc, int n_bits,  Expr left, Expr right);
+  Expr vc_bvSignedRightShiftExprExpr(VC vc, int n_bits, Expr left, Expr right);
+
+  // These shifts are old-style. Kept for compatability---oldstyle.
   Expr vc_bvLeftShiftExpr(VC vc, int sh_amt, Expr child);
   Expr vc_bvRightShiftExpr(VC vc, int sh_amt, Expr child);
   /* Same as vc_bvLeftShift only that the answer in 32 bits long */

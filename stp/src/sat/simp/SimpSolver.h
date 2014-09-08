@@ -25,7 +25,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "../core/Solver.h"
 
 
-namespace Minisat {
+namespace MinisatSTP {
 
 //=================================================================================================
 
@@ -34,7 +34,7 @@ class SimpSolver : public Solver {
  public:
     // Constructor/Destructor:
     //
-    SimpSolver();
+    SimpSolver(volatile bool& interrupt);
     ~SimpSolver();
 
     // Problem specification:

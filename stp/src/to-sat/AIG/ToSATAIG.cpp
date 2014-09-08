@@ -5,6 +5,8 @@
 namespace BEEV
 {
 
+    int ToSATAIG::cnf_calls=0;
+
     bool
     ToSATAIG::CallSAT(SATSolver& satSolver, const ASTNode& input, bool needAbsRef)
     {
@@ -94,7 +96,7 @@ namespace BEEV
             {
               SATSolver::Var var = (*pLit) >> 1;
               assert ((var < satSolver.nVars()));
-              Minisat::Lit l = SATSolver::mkLit(var, (*pLit) & 1);
+              MinisatSTP::Lit l = SATSolver::mkLit(var, (*pLit) & 1);
               satSolverClause.push(l);
             }
 
@@ -107,9 +109,17 @@ namespace BEEV
       if (bm->UserFlags.output_bench_flag)
         cerr << "Converting to CNF via ABC's AIG package can't yet print out bench format" << endl;
 
-	  Cnf_ClearMemory();
-	  Cnf_DataFree(cnfData);
-	  cnfData = NULL;
+
+      // This releases the memory used by the CNF generator, particularly some data tables.
+      // If CNF generation is going to be called lots, we'd rather keep it around.
+      // because the datatables are expensive to generate.
+       if (cnf_calls == 0)
+           Cnf_ClearMemory();
+
+       cnf_calls++;
+
+        Cnf_DataFree(cnfData);
+        cnfData = NULL;
 
 	// Minisat doesn't, but simplifying minisat and cryptominsat eliminate variables during their
         // simplification phases. The problem is that we may later add clauses in that refer to those
@@ -160,7 +170,7 @@ namespace BEEV
 
                                 ASTNodeToSATVar::iterator it = nodeToSATVar.find(ar.index_symbol);
                                 SATSolver::vec_literals index;
-                                Minisat::vec<Minisat::lbool> index_constants;
+                                MinisatSTP::vec<MinisatSTP::lbool> index_constants;
                                 const int index_width = arr_it->first.GetValueWidth();
                                 if (it != nodeToSATVar.end())
                                     {
@@ -173,9 +183,9 @@ namespace BEEV
                                         const CBV c = ar.index_symbol.GetBVConst();
                                         for (int i = 0; i < index_width; i++)
                                             if (CONSTANTBV::BitVector_bit_test(c, i))
-                                                index_constants.push((Minisat::lbool) satSolver.true_literal());
+                                                index_constants.push((MinisatSTP::lbool) satSolver.true_literal());
                                             else
-                                                index_constants.push((Minisat::lbool) satSolver.false_literal());
+                                                index_constants.push((MinisatSTP::lbool) satSolver.false_literal());
                                     }
                                 else
                                     {
@@ -204,7 +214,7 @@ namespace BEEV
                                 assert((index.size() > 0) ^ (index_constants.size() > 0));
 
                                 SATSolver::vec_literals value;
-                                Minisat::vec<Minisat::lbool> value_constants;
+                                MinisatSTP::vec<MinisatSTP::lbool> value_constants;
                                 it = nodeToSATVar.find(ar.symbol);
 
                                 if (it != nodeToSATVar.end())
@@ -221,9 +231,9 @@ namespace BEEV
                                         CBV c = ar.symbol.GetBVConst();
                                         for (int i = 0; i < ar.symbol.GetValueWidth(); i++)
                                             if (CONSTANTBV::BitVector_bit_test(c, i))
-                                                value_constants.push((Minisat::lbool) satSolver.true_literal());
+                                                value_constants.push((MinisatSTP::lbool) satSolver.true_literal());
                                             else
-                                                value_constants.push((Minisat::lbool) satSolver.false_literal());
+                                                value_constants.push((MinisatSTP::lbool) satSolver.false_literal());
                                     }
                                 else
                                     {
@@ -257,6 +267,11 @@ namespace BEEV
                         found = false;
                     }
             }
+
+      //void setHardTimeout(int sec);
+      //setHardTimeout(500);
+
+
       bm->GetRunTimes()->start(RunTimes::Solving);
       satSolver.solve();
       bm->GetRunTimes()->stop(RunTimes::Solving);

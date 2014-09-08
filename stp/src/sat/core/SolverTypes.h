@@ -30,7 +30,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "../mtl/Map.h"
 #include "../mtl/Alloc.h"
 
-namespace Minisat {
+namespace MinisatSTP {
 
 //=================================================================================================
 // Variables, literals, lifted booleans, clauses:
@@ -81,9 +81,9 @@ const Lit lit_Error = { -1 };  // }
 //       does enough constant propagation to produce sensible code, and this appears to be somewhat
 //       fragile unfortunately.
 
-#define l_True  (lbool((uint8_t)0)) // gcc does not do constant propagation if these are real constants.
-#define l_False (lbool((uint8_t)1))
-#define l_Undef (lbool((uint8_t)2))
+#define l_True  (MinisatSTP::lbool((uint8_t)0)) // gcc does not do constant propagation if these are real constants.
+#define l_False (MinisatSTP::lbool((uint8_t)1))
+#define l_Undef (MinisatSTP::lbool((uint8_t)2))
 
 class lbool {
     uint8_t value;

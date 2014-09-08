@@ -43,6 +43,10 @@ namespace BEEV {
   SOLVER_RETURN_TYPE STP::TopLevelSTP(const ASTNode& inputasserts, 
 				      const ASTNode& query)
   {      
+
+    // Unfortunatey this is a global variable,which the aux function needs to overwrite sometimes.
+    bool saved_ack = bm->UserFlags.ackermannisation;
+
     ASTNode original_input;
 
     if (query != bm->ASTFalse)
@@ -54,13 +58,13 @@ namespace BEEV {
 
     SATSolver *newS;
     if (bm->UserFlags.solver_to_use == UserDefinedFlags::SIMPLIFYING_MINISAT_SOLVER)
-		newS = new SimplifyingMinisat();
+		newS = new SimplifyingMinisat(bm->soft_timeout_expired);
     else if (bm->UserFlags.solver_to_use == UserDefinedFlags::CRYPTOMINISAT_SOLVER)
                     newS = new CryptoMinisat();
     else if (bm->UserFlags.solver_to_use == UserDefinedFlags::MINISAT_SOLVER)
-      newS = new MinisatCore<Minisat::Solver>();
+      newS = new MinisatCore<MinisatSTP::Solver>(bm->soft_timeout_expired);
     else if (bm->UserFlags.solver_to_use == UserDefinedFlags::MINISAT_PROPAGATORS)
-      newS = new MinisatCore_prop<Minisat::Solver_prop>();
+      newS = new MinisatCore_prop<MinisatSTP::Solver_prop>(bm->soft_timeout_expired);
 
 
 
@@ -83,12 +87,13 @@ namespace BEEV {
 
     delete newS;
 
+    bm->UserFlags.ackermannisation =saved_ack;
     return result;
 
   } //End of TopLevelSTP()
   
   ASTNode
-  STP::callSizeReducing(ASTNode simplified_solved_InputToSAT, BVSolver* bvSolver, PropagateEqualities *pe, const int initial_difficulty_score)
+  STP::callSizeReducing(ASTNode simplified_solved_InputToSAT, BVSolver* bvSolver, PropagateEqualities *pe, const int initial_difficulty_score, int & actualBBSize)
   {
     while (true)
       {
@@ -98,20 +103,37 @@ namespace BEEV {
           break;
       }
 
+    actualBBSize=-1;
+
     // Expensive, so only want to do it once.
     if (bm->UserFlags.isSet("bitblast-simplification", "1") && initial_difficulty_score < 250000)
       {
         BBNodeManagerAIG bbnm;
-        SimplifyingNodeFactory nf(*(bm->hashingNodeFactory), *bm);
-        BitBlaster<BBNodeAIG, BBNodeManagerAIG> bb(&bbnm, simp, &nf , &(bm->UserFlags));
+        BitBlaster<BBNodeAIG, BBNodeManagerAIG> bb(&bbnm, simp, bm->defaultNodeFactory , &(bm->UserFlags));
         ASTNodeMap fromTo;
-        bb.getConsts(simplified_solved_InputToSAT, fromTo);
+        ASTNodeMap equivs;
+        bb.getConsts(simplified_solved_InputToSAT, fromTo,equivs);
+
+        if (equivs.size() > 0)
+          {
+            /* These nodes have equivalent AIG representations, so even though they have different
+             * word level expressions they are identical semantically. So we pick one of the ASTnodes
+             * and replace the others with it.
+             * TODO: I replace with the lower id node, sometimes though we replace with much more
+             * difficult looking ASTNodes.
+            */
+            ASTNodeMap cache;
+            simplified_solved_InputToSAT = SubstitutionMap::replace(simplified_solved_InputToSAT, equivs, cache,bm->defaultNodeFactory,false,true);
+            bm->ASTNodeStats(bb_message.c_str(), simplified_solved_InputToSAT);
+          }
+
         if (fromTo.size() > 0)
           {
             ASTNodeMap cache;
-            simplified_solved_InputToSAT = SubstitutionMap::replace(simplified_solved_InputToSAT, fromTo, cache,&nf);
+            simplified_solved_InputToSAT = SubstitutionMap:: replace(simplified_solved_InputToSAT, fromTo, cache,bm->defaultNodeFactory);
             bm->ASTNodeStats(bb_message.c_str(), simplified_solved_InputToSAT);
           }
+        actualBBSize =  bbnm.totalNumberOfNodes();
       }
     return simplified_solved_InputToSAT;
   }
@@ -121,6 +143,7 @@ namespace BEEV {
    ASTNode
   STP::sizeReducing(ASTNode simplified_solved_InputToSAT, BVSolver* bvSolver, PropagateEqualities *pe)
   {
+
     simplified_solved_InputToSAT = pe->topLevel(simplified_solved_InputToSAT, arrayTransformer);
     if (simp->hasUnappliedSubstitutions())
       {
@@ -147,8 +170,7 @@ namespace BEEV {
     if (bm->UserFlags.bitConstantProp_flag)
       {
         bm->GetRunTimes()->start(RunTimes::ConstantBitPropagation);
-        SimplifyingNodeFactory nf(*(bm->hashingNodeFactory), *bm);
-        simplifier::constantBitP::ConstantBitPropagation cb(simp, &nf, simplified_solved_InputToSAT);
+        simplifier::constantBitP::ConstantBitPropagation cb(simp, bm->defaultNodeFactory, simplified_solved_InputToSAT);
         simplified_solved_InputToSAT = cb.topLevelBothWays(simplified_solved_InputToSAT, true,false);
 
         bm->GetRunTimes()->stop(RunTimes::ConstantBitPropagation);
@@ -158,8 +180,8 @@ namespace BEEV {
 
         if (simp->hasUnappliedSubstitutions())
           {
-            simplified_solved_InputToSAT = simp->applySubstitutionMap(simplified_solved_InputToSAT);
-            simp->haveAppliedSubstitutionMap();
+          simplified_solved_InputToSAT = simp->applySubstitutionMap(simplified_solved_InputToSAT);
+          simp->haveAppliedSubstitutionMap();
           }
 
         bm->ASTNodeStats(cb_message.c_str(), simplified_solved_InputToSAT);
@@ -180,8 +202,7 @@ namespace BEEV {
 
     if (bm->UserFlags.isSet("always-true", "0"))
       {
-        SimplifyingNodeFactory nf(*(bm->hashingNodeFactory), *bm);
-        AlwaysTrue always (simp,bm,&nf);
+        AlwaysTrue always (simp,bm,bm->defaultNodeFactory);
         simplified_solved_InputToSAT = always.topLevel(simplified_solved_InputToSAT);
         bm->ASTNodeStats("After removing always true: ", simplified_solved_InputToSAT);
       }
@@ -208,8 +229,8 @@ namespace BEEV {
             cerr << "Difficulty Initially:" << difficulty.score(original_input) << endl;
 
     // A heap object so I can easily control its lifetime.
-    BVSolver* bvSolver = new BVSolver(bm, simp);
-    PropagateEqualities * pe = new PropagateEqualities(simp,bm->defaultNodeFactory,bm);
+    std::auto_ptr<BVSolver> bvSolver(new BVSolver(bm, simp));
+    std::auto_ptr<PropagateEqualities> pe (new PropagateEqualities(simp,bm->defaultNodeFactory,bm));
 
     ASTNode simplified_solved_InputToSAT = original_input;
 
@@ -217,12 +238,14 @@ namespace BEEV {
     // The bit-vector simplifications are more thorough than the array simplifications. For example,
     // we don't currently do unconstrained elimination on arrays--- but we do for bit-vectors.
     // A better way to do this would be to estimate the number of axioms introduced.
-    // TODO: Should be enabled irrespective of whether refinement is enabled.
     // TODO: I chose the number of reads we perform this operation at randomly.
     bool removed = false;
-    if ((bm->UserFlags.ackermannisation && numberOfReadsLessThan(simplified_solved_InputToSAT,50)) || bm->UserFlags.isSet("upfront-ack", "0"))
+    if (((bm->UserFlags.ackermannisation && numberOfReadsLessThan(simplified_solved_InputToSAT,50)) || bm->UserFlags.isSet("upfront-ack", "0"))
+        || numberOfReadsLessThan(simplified_solved_InputToSAT,10)
+    )
       {
-          // If the number of axioms that would be added it small. Remove them.
+              // If the number of axioms that would be added it small. Remove them.
+              bm->UserFlags.ackermannisation = true;
               simplified_solved_InputToSAT = arrayTransformer->TransformFormula_TopLevel(simplified_solved_InputToSAT);
               if (bm->UserFlags.stats_flag)
                 cerr << "Have removed array operations" << endl;
@@ -234,26 +257,32 @@ namespace BEEV {
       assert(!arrayops);
 
     // Run size reducing just once.
-    simplified_solved_InputToSAT = sizeReducing(simplified_solved_InputToSAT, bvSolver,pe);
+    simplified_solved_InputToSAT = sizeReducing(simplified_solved_InputToSAT, bvSolver.get(),pe.get());
 
     unsigned initial_difficulty_score = difficulty.score(simplified_solved_InputToSAT);
+
+    int bitblasted_difficulty = -1;
 
     // Fixed point it if it's not too difficult.
     // Currently we discards all the state each time sizeReducing is called,
     // so it's expensive to call.
     if ((!arrayops && initial_difficulty_score < 1000000) || bm->UserFlags.isSet("preserving-fixedpoint", "0"))
-           simplified_solved_InputToSAT = callSizeReducing(simplified_solved_InputToSAT, bvSolver,pe, initial_difficulty_score);
+           simplified_solved_InputToSAT = callSizeReducing(simplified_solved_InputToSAT, bvSolver.get(),pe.get(), initial_difficulty_score, bitblasted_difficulty);
 
     if ((!arrayops || bm->UserFlags.isSet("array-difficulty-reversion", "1")))
       {
         initial_difficulty_score = difficulty.score(simplified_solved_InputToSAT);
       }
 
+    if (bitblasted_difficulty != -1 && bm->UserFlags.stats_flag)
+      cout << "Initial Bitblasted size:" << bitblasted_difficulty << endl;
+
+
     if (bm->UserFlags.stats_flag)
       cout << "Difficulty After Size reducing:" << initial_difficulty_score << endl;
 
     // So we can delete the object and release all the hash-buckets storage.
-    Revert_to* revert = new Revert_to();
+    auto_ptr<Revert_to> revert(new Revert_to());
 
     if ((!arrayops || bm->UserFlags.isSet("array-difficulty-reversion", "1")))
       {
@@ -268,12 +297,15 @@ namespace BEEV {
     //DAG is minimized as much as possibly, and ideally should
     //garuntee that all liketerms in BVPLUSes have been combined.
     bm->SimplifyWrites_InPlace_Flag = false;
-    bm->Begin_RemoveWrites = false;
-    bm->start_abstracting = false;
+    //bm->Begin_RemoveWrites = false;
+    //bm->start_abstracting = false;
     bm->TermsAlreadySeenMap_Clear();
     do
       {
         inputToSAT = simplified_solved_InputToSAT;
+
+        if (bm->soft_timeout_expired)
+            return SOLVER_TIMEOUT;
 
         if (bm->UserFlags.optimize_flag)
           {
@@ -311,8 +343,7 @@ namespace BEEV {
     if (bm->UserFlags.bitConstantProp_flag)
       {
         bm->GetRunTimes()->start(RunTimes::ConstantBitPropagation);
-        SimplifyingNodeFactory nf(*(bm->hashingNodeFactory), *bm);
-        simplifier::constantBitP::ConstantBitPropagation cb(simp, &nf, simplified_solved_InputToSAT);
+        simplifier::constantBitP::ConstantBitPropagation cb(simp, bm->defaultNodeFactory, simplified_solved_InputToSAT);
         simplified_solved_InputToSAT = cb.topLevelBothWays(simplified_solved_InputToSAT);
 
         bm->GetRunTimes()->stop(RunTimes::ConstantBitPropagation);
@@ -342,6 +373,9 @@ namespace BEEV {
             bm->ASTNodeStats(pl_message.c_str(), simplified_solved_InputToSAT);
           }
       }
+
+    if (bm->soft_timeout_expired)
+        return SOLVER_TIMEOUT;
 
     // Simplify using Ite context
     if (bm->UserFlags.optimize_flag && bm->UserFlags.isSet("ite-context", "0"))
@@ -419,11 +453,35 @@ namespace BEEV {
 
     bm->TermsAlreadySeenMap_Clear();
 
-    bm->start_abstracting = false;
+    //bm->start_abstracting = false;
     bm->SimplifyWrites_InPlace_Flag = false;
-    bm->Begin_RemoveWrites = false;
+    //bm->Begin_RemoveWrites = false;
 
     long final_difficulty_score = difficulty.score(simplified_solved_InputToSAT);
+
+    bool worse= false;
+    if (final_difficulty_score > 1.1 * initial_difficulty_score)
+        worse = true;
+
+    // It's of course very wasteful to do this! Later I'll make it reuse the work..
+    // We bit-blast again, in order to throw it away, so that we can measure whether
+    // the number of AIG nodes is smaller. The difficulty score is sometimes completely
+    // wrong, the sage-app7 are the motivating examples. The other way to improve it would
+    // be to fix the difficulty scorer!
+    if (!worse && (bitblasted_difficulty != -1))
+     {
+        BBNodeManagerAIG bbnm;
+        BitBlaster<BBNodeAIG, BBNodeManagerAIG> bb(&bbnm, simp, bm->defaultNodeFactory , &(bm->UserFlags));
+        bb.BBForm(simplified_solved_InputToSAT);
+        int newBB=  bbnm.totalNumberOfNodes();
+        if (bm->UserFlags.stats_flag)
+          cerr << "Final BB Size:" << newBB << endl;
+
+        if (bitblasted_difficulty < newBB)
+          worse = true;
+    }
+
+
     if (bm->UserFlags.stats_flag)
       {
         cerr << "Initial Difficulty Score:" << initial_difficulty_score << endl;
@@ -431,7 +489,7 @@ namespace BEEV {
       }
 
     bool optimize_enabled = bm->UserFlags.optimize_flag;
-    if (final_difficulty_score > 1.1 * initial_difficulty_score &&
+    if (worse &&
        (!arrayops || bm->UserFlags.isSet("array-difficulty-reversion", "1")) &&
        bm->UserFlags.isSet("difficulty-reversion", "1"))
       {
@@ -459,7 +517,7 @@ namespace BEEV {
         // it to put back in all the bad simplifications.
         bm->UserFlags.optimize_flag = false;
       }
-    delete revert;
+    revert.reset(NULL);
 
     simplified_solved_InputToSAT = arrayTransformer->TransformFormula_TopLevel(simplified_solved_InputToSAT);
     bm->ASTNodeStats("after transformation: ", simplified_solved_InputToSAT);
@@ -480,10 +538,9 @@ namespace BEEV {
     bm->ClearAllTables();
 
     // Deleting it clears out all the buckets associated with hashmaps etc. too.
-    delete bvSolver;
-    bvSolver = NULL;
-    delete pe;
-    pe = NULL;
+    bvSolver.reset(NULL);
+    pe.reset(NULL);
+
 
     if (bm->UserFlags.stats_flag)
       simp->printCacheStatus();
@@ -507,15 +564,24 @@ namespace BEEV {
           simplified_solved_InputToSAT = bm->ASTFalse;
       }
 
-    ToSATAIG toSATAIG(bm, cb);
-    toSATAIG.setArrayTransformer(arrayTransformer);
+    ToSATAIG toSATAIG(bm, cb, arrayTransformer);
 
     ToSATBase* satBase = bm->UserFlags.isSet("traditional-cnf", "0") ? tosat : ((ToSAT*) &toSATAIG) ;
+
+    if (bm->soft_timeout_expired)
+        return SOLVER_TIMEOUT;
 
     // If it doesn't contain array operations, use ABC's CNF generation.
     res = Ctr_Example->CallSAT_ResultCheck(NewSolver, simplified_solved_InputToSAT, original_input, satBase,
         maybeRefinement);
 
+    if (bm->soft_timeout_expired)
+      {
+        if (toSATAIG.cbIsDestructed())
+          cleaner.release();
+
+        return SOLVER_TIMEOUT;
+      }
     if (SOLVER_UNDECIDED != res)
       {
         // If the aig converter knows that it is never going to be called again,

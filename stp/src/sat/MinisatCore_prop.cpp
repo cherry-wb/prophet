@@ -6,9 +6,9 @@ namespace BEEV
 {
 
   template <class T>
-  MinisatCore_prop<T>::MinisatCore_prop()
+  MinisatCore_prop<T>::MinisatCore_prop(volatile bool& timeout)
   {
-     s = new T();
+     s = new T(timeout);
   };
 
   template <class T>
@@ -19,7 +19,7 @@ namespace BEEV
 
   template <class T>
   bool
-  MinisatCore_prop<T>::addArray(int array_id, const SATSolver::vec_literals& i, const SATSolver::vec_literals& v, const Minisat::vec<Minisat::lbool> & ki, const Minisat::vec<Minisat::lbool> & kv )
+  MinisatCore_prop<T>::addArray(int array_id, const SATSolver::vec_literals& i, const SATSolver::vec_literals& v, const MinisatSTP::vec<MinisatSTP::lbool> & ki, const MinisatSTP::vec<MinisatSTP::lbool> & kv )
   {
 	  s->addArray(array_id, i,v, ki,kv);
    return true;
@@ -30,7 +30,7 @@ namespace BEEV
   bool
   MinisatCore_prop<T>::addClause(const SATSolver::vec_literals& ps) // Add a clause to the solver.
   {
-    return s->addClause(ps);
+    s->addClause(ps);
   }
 
   template <class T>
@@ -55,11 +55,11 @@ namespace BEEV
   uint8_t
   MinisatCore_prop<T>::modelValue(Var x) const
   {
-    return Minisat::toInt(s->modelValue(x));
+    return MinisatSTP::toInt(s->modelValue(x));
   }
 
   template <class T>
-  Minisat::Var
+  MinisatSTP::Var
   MinisatCore_prop<T>::newVar()
   {
     return s->newVar();
@@ -68,7 +68,7 @@ namespace BEEV
   template <class T>
   int MinisatCore_prop<T>::setVerbosity(int v)
   {
-    return s->verbosity = v;
+    s->verbosity = v;
   }
 
   template <class T>
@@ -78,8 +78,8 @@ namespace BEEV
   template <class T>
   void MinisatCore_prop<T>::printStats()
     {
-      double cpu_time = Minisat::cpuTime();
-      double mem_used = Minisat::memUsedPeak();
+      double cpu_time = MinisatSTP::cpuTime();
+      double mem_used = MinisatSTP::memUsedPeak();
       printf("restarts              : %"PRIu64"\n", s->starts);
       printf("conflicts             : %-12"PRIu64"   (%.0f /sec)\n", s->conflicts   , s->conflicts   /cpu_time);
       printf("decisions             : %-12"PRIu64"   (%4.2f %% random) (%.0f /sec)\n", s->decisions, (float)s->rnd_decisions*100 / (float)s->decisions, s->decisions   /cpu_time);
@@ -95,5 +95,5 @@ namespace BEEV
     s->random_seed = i;
   }
 
-  template class MinisatCore_prop<Minisat::Solver_prop>;
+  template class MinisatCore_prop<MinisatSTP::Solver_prop>;
 };

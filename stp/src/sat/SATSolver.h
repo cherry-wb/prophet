@@ -22,14 +22,14 @@ namespace BEEV
 
     virtual ~SATSolver(){}
 
-    class vec_literals : public Minisat::vec<Minisat::Lit>
+    class vec_literals : public MinisatSTP::vec<MinisatSTP::Lit>
     {};
 
     virtual bool
     addClause(const SATSolver::vec_literals& ps)=0; // Add a clause to the solver.
 
     virtual
-    bool addArray(int array_id, const SATSolver::vec_literals& i, const SATSolver::vec_literals& v, const Minisat::vec<Minisat::lbool>&, const Minisat::vec<Minisat::lbool>& )
+    bool addArray(int array_id, const SATSolver::vec_literals& i, const SATSolver::vec_literals& v, const MinisatSTP::vec<MinisatSTP::lbool>&, const MinisatSTP::vec<MinisatSTP::lbool>& )
     {
      std::cerr << "Not implemented";
      exit(1);
@@ -45,7 +45,7 @@ namespace BEEV
     typedef int Var;
     typedef uint8_t lbool;
 
-    static inline  Minisat::Lit  mkLit     (Var var, bool sign) { Minisat::Lit p; p.x = var + var + (int)sign; return p; }
+    static inline  MinisatSTP::Lit  mkLit     (Var var, bool sign) { MinisatSTP::Lit p; p.x = var + var + (int)sign; return p; }
 
     virtual uint8_t   modelValue (Var x) const = 0;
 
@@ -71,6 +71,18 @@ namespace BEEV
     virtual void setFrozen(Var x)
     {}
 
+    virtual int nClauses()
+    {
+      std::cerr << "Not yet implemented.";
+      exit(1);
+    }
+
+    virtual bool simplify()
+    {
+      std::cerr << "Not yet implemented.";
+      exit(1);
+
+    }
   };
 };
 #endif

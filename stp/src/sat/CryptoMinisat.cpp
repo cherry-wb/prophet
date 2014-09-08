@@ -34,7 +34,7 @@ namespace BEEV
     for (int i =0; i<ps.size();i++)
       v.push(MINISAT::Lit(var(ps[i]), sign(ps[i])));
 
-    return s->addClause(v);
+    s->addClause(v);
   }
 
   bool
@@ -55,7 +55,7 @@ namespace BEEV
     return s->model[x].getchar();
   }
 
-  Minisat::Var
+  MinisatSTP::Var
   CryptoMinisat::newVar()
   {
     return s->newVar();
@@ -63,7 +63,7 @@ namespace BEEV
 
   int CryptoMinisat::setVerbosity(int v)
   {
-    return s->verbosity = v;
+    s->verbosity = v;
   }
 
   int CryptoMinisat::nVars()
@@ -71,8 +71,8 @@ namespace BEEV
 
   void CryptoMinisat::printStats()
     {
-      double cpu_time = Minisat::cpuTime();
-      double mem_used = Minisat::memUsedPeak();
+      double cpu_time = MinisatSTP::cpuTime();
+      double mem_used = MinisatSTP::memUsedPeak();
       printf("restarts              : %"PRIu64"\n", s->starts);
       printf("conflicts             : %-12"PRIu64"   (%.0f /sec)\n", s->conflicts   , s->conflicts   /cpu_time);
       printf("decisions             : %-12"PRIu64"   (%4.2f %% random) (%.0f /sec)\n", s->decisions, (float)s->rnd_decisions*100 / (float)s->decisions, s->decisions   /cpu_time);

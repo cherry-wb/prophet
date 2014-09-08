@@ -6,7 +6,7 @@
 
 #include "SATSolver.h"
 
-namespace Minisat
+namespace MinisatSTP
 {
    class SimpSolver;
 }
@@ -15,11 +15,11 @@ namespace BEEV
 {
   class SimplifyingMinisat : public SATSolver
   {
-    Minisat::SimpSolver* s;
+    MinisatSTP::SimpSolver* s;
 
   public:
 
-    SimplifyingMinisat();
+    SimplifyingMinisat(volatile bool& timeout);
     ~SimplifyingMinisat();
 
     bool

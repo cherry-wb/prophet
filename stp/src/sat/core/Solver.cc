@@ -23,7 +23,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "../mtl/Sort.h"
 #include "../core/Solver.h"
 
-using namespace Minisat;
+using namespace MinisatSTP;
 
 //=================================================================================================
 // Options:
@@ -48,7 +48,7 @@ static DoubleOption  opt_garbage_frac      (_cat, "gc-frac",     "The fraction o
 // Constructor/Destructor:
 
 
-Solver::Solver() :
+Solver::Solver(volatile bool& interrupt) :
 
     // Parameters (user settable):
     //
@@ -95,7 +95,7 @@ Solver::Solver() :
     //
   , conflict_budget    (-1)
   , propagation_budget (-1)
-  , asynch_interrupt   (false)
+  , asynch_interrupt   (interrupt)
 {}
 
 
@@ -747,6 +747,61 @@ static double luby(double y, int x){
     return pow(y, seq);
 }
 
+// NB. This method doesn't copy into the modelValue. You need to read the results
+// with value(). So you can't add any clauses to the SAT solver until you've
+// cancelleduntil(0)  --- which clears the values. Otherwise the results will be wrong.
+
+bool Solver::unitPropagate(  const vec<Lit>& assumps)
+{
+  model.clear();
+  conflict.clear();
+
+  remove_satisfied = false;
+  ok = true;
+
+  cancelUntil(0);
+  for (int i = 0; i < nVars(); i++)
+    {
+    assert(value(i) == l_Undef);
+    }
+
+  assert(decisionLevel()== 0);
+
+  // None of the values should be known.
+  for (int i = 0; i < nVars(); i++)
+    {
+    assert(value(i) == l_Undef);
+    }
+
+  assumptions.clear();
+  assumps.copyTo(assumptions);
+
+  while (decisionLevel() < assumptions.size())
+    {
+      // Perform user provided assumption:
+      Lit p = assumptions[decisionLevel()];
+      if (value(p) == l_True){
+          // Dummy decision level:
+          newDecisionLevel();
+      }else if (value(p) == l_False){
+          analyzeFinal(~p, conflict);
+          ok =false;
+          break;
+      }else{
+          newDecisionLevel();
+          uncheckedEnqueue(p);
+          if (propagate() != CRef_Undef)
+            {
+            ok =false;
+            break;
+            }
+      }
+  }
+
+  return ok;
+}
+
+
 // NOTE: assumptions passed in member-variable 'assumptions'.
 lbool Solver::solve_()
 {
@@ -799,11 +854,18 @@ lbool Solver::solve_()
 
 static Var mapVar(Var x, vec<Var>& map, Var& max)
 {
-    if (map.size() <= x || map[x] == -1){
+  if (max < x+1)
+    max =x+1;
+  return x;
+
+/*
+
+   if (map.size() <= x || map[x] == -1){
         map.growTo(x+1, -1);
         map[x] = max++;
     }
     return map[x];
+    */
 }
 
 
@@ -826,6 +888,7 @@ void Solver::toDimacs(const char *file, const vec<Lit>& assumps)
     toDimacs(f, assumps);
     fclose(f);
 }
+
 
 
 void Solver::toDimacs(FILE* f, const vec<Lit>& assumps)

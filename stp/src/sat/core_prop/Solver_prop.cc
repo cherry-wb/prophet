@@ -32,7 +32,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "../mtl/Sort.h"
 #include "../core_prop/Solver_prop.h"
 
-using namespace Minisat;
+using namespace MinisatSTP;
 
 //=================================================================================================
 // Options:
@@ -56,7 +56,7 @@ static DoubleOption  opt_garbage_frac      (_cat, "gc-frac",     "The fraction o
 //=================================================================================================
 // Constructor/Destructor:
 
-Solver_prop::Solver_prop() :
+Solver_prop::Solver_prop(volatile bool& timeout) :
 
     // Parameters (user settable):
     //
@@ -111,7 +111,7 @@ Solver_prop::Solver_prop() :
     //
   , conflict_budget    (-1)
   , propagation_budget (-1)
-  , asynch_interrupt   (false)
+  , asynch_interrupt   (timeout)
 {}
 
 
@@ -129,8 +129,8 @@ Solver_prop::~Solver_prop()
 const bool debug_print = false;
 
 bool
-sortByLevel(const Minisat::Solver_prop::Assignment& a,
-        const Minisat::Solver_prop::Assignment& b)
+sortByLevel(const MinisatSTP::Solver_prop::Assignment& a,
+        const MinisatSTP::Solver_prop::Assignment& b)
 {
     return a.decisionLevel < b.decisionLevel;
 }
@@ -910,68 +910,37 @@ void Solver_prop::cancelUntil(int level) {
 	    int array_id;
 	};
 
-	vec<index_type> toRep;
-	vec<ArrayAccess*> aaRep;
 
 	vec<ArrayAccess*> toReAdd;
 
         // look through the map, and remove it.
         while ((arrayHistory_stack.size() > 0) && (arrayHistory_stack.last().decisionLevel > level))
         {
-        	ArrayAccess& aa = *(arrayHistory_stack.last().aa);
-                assert(aa.known_index);
-                assert(!aa.isIndexConstant()); // Shouldn't remove known indexes.
-                assert(IndexIsSet(aa));   // The index shouldn't be unset yet.
+          ArrayAccess& aa = *(arrayHistory_stack.last().aa);
+          assert(aa.known_index);
+          assert(!aa.isIndexConstant());
+          // Shouldn't remove known indexes.
+          assert(IndexIsSet(aa));
+          // The index shouldn't be unset yet.
 
-        	// Get the integer.
-                index_type asInt = index_as_int(aa);
-        	assert(val_to_aa[aa.array_id].has(asInt));
+          // Get the integer.
+          index_type asInt = index_as_int(aa);
+          assert(val_to_aa[aa.array_id].has(asInt));
 
-        	std::vector<ArrayAccess*>& aaV = val_to_aa[aa.array_id][asInt];
+          std::vector<ArrayAccess*>& aaV = val_to_aa[aa.array_id][asInt];
+          assert(aaV.size() >0);
+          assert(aaV.back() == &aa);
 
-        	// We'll remove the zeroeth array access, so need to re-add all of the array axioms.
-                if (aaV[0] == &aa)
-                    {
-                        toRep.push(asInt);
-                        aaRep.push(&aa);
-                    }
+          aaV.erase(aaV.begin() + (aaV.size() - 1));
 
-                bool found = false;
-                for (int i = 0; i < (int) aaV.size(); i++)
-                    if (aaV[i] == &aa)
-                        {
-                            //Find the same pointer and erase it.
-                            aaV.erase(aaV.begin() + i);
-                            found = true;
-                            break;
-                        }
-                assert(found);
+          if (aaV.size() == 0)
+            val_to_aa[aa.array_id].remove(asInt);
 
-                    if (aaV.size() == 0)
-                        val_to_aa[aa.array_id].remove(asInt);
+          aa.known_index = false;
+          toReAdd.push(&aa);
+          arrayHistory_stack.shrink(1);
+        }
 
-                    aa.known_index = false;
-                    toReAdd.push(&aa);
-                    arrayHistory_stack.shrink(1);
-                }
-
-	// The zeroeth of these numbers has been deleted, so we might need to redo the implications.
-	for (int i=0; i < toRep.size(); i++)
-	{
-	        index_type asInt = toRep[i];
-	        ArrayAccess& aa = *aaRep[i];
-
-	        if (val_to_aa[aa.array_id].has(asInt))
-	            {
-
-	                std::vector<ArrayAccess*>& aaV = val_to_aa[aa.array_id][asInt];
-	                for (int j=1;j<(int)aaV.size();j++)
-	                {
-	                        assert(aa.known_index);
-	                        writeOutArrayAxiom(*aaV[j]);
-	                }
-	            }
-	}
 
 	sortAlternateTrail();
         while (alternate_trail.size() > 0 && (alternate_trail.back().decisionLevel > level))
@@ -1167,7 +1136,7 @@ void Solver_prop::analyze(CRef confl, vec<Lit>& out_learnt, int& out_btlevel)
 
                 if (debug_print)
                     printf("%d %d\n", toInt(p), toInt(var(p)));
-                Minisat::Clause  cl= ca[confl];
+                MinisatSTP::Clause  cl= ca[confl];
 
                 assert(ca[confl][0] ==p);
                 assert(value(p) != l_Undef);

@@ -129,7 +129,7 @@ namespace BEEV
             bool negate = (NOT == node.GetKind()) ? true : false;
             ASTNode n = negate ? node[0] : node;
             SATSolver::Var v = LookupOrCreateSATVar(newSolver, n);
-            Minisat::Lit l = SATSolver::mkLit(v, negate);
+            MinisatSTP::Lit l = SATSolver::mkLit(v, negate);
             satSolverClause.push(l);
           }
 

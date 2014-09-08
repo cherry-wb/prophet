@@ -4,9 +4,9 @@
 
 namespace BEEV
 {
-  SimplifyingMinisat::SimplifyingMinisat()
+  SimplifyingMinisat::SimplifyingMinisat(volatile bool& timeout)
   {
-	 s = new Minisat::SimpSolver();
+	 s = new MinisatSTP::SimpSolver(timeout);
   }
 
   SimplifyingMinisat::~SimplifyingMinisat()
@@ -17,7 +17,7 @@ namespace BEEV
   bool
   SimplifyingMinisat::addClause(const vec_literals& ps) // Add a clause to the solver.
   {
-    return s->addClause(ps);
+    s->addClause(ps);
   }
 
   bool
@@ -44,12 +44,12 @@ namespace BEEV
   uint8_t
   SimplifyingMinisat::modelValue(Var x) const
   {
-   return Minisat::toInt(s->modelValue(x));
+   return MinisatSTP::toInt(s->modelValue(x));
   }
 
   int SimplifyingMinisat::setVerbosity(int v)
   {
-    return s->verbosity = v;
+    s->verbosity = v;
   }
 
   void SimplifyingMinisat::setSeed(int i)
@@ -57,7 +57,7 @@ namespace BEEV
       s->random_seed = i;
     }
 
-  Minisat::Var
+  MinisatSTP::Var
   SimplifyingMinisat::newVar()
   {
     return s->newVar();
@@ -68,8 +68,8 @@ namespace BEEV
 
   void SimplifyingMinisat::printStats()
   {
-    double cpu_time = Minisat::cpuTime();
-    double mem_used = Minisat::memUsedPeak();
+    double cpu_time = MinisatSTP::cpuTime();
+    double mem_used = MinisatSTP::memUsedPeak();
     printf("restarts              : %"PRIu64"\n", s->starts);
     printf("conflicts             : %-12"PRIu64"   (%.0f /sec)\n", s->conflicts   , s->conflicts   /cpu_time);
     printf("decisions             : %-12"PRIu64"   (%4.2f %% random) (%.0f /sec)\n", s->decisions, (float)s->rnd_decisions*100 / (float)s->decisions, s->decisions   /cpu_time);

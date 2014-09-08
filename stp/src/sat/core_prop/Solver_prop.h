@@ -29,7 +29,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <vector>
 
 
-namespace Minisat {
+namespace MinisatSTP {
 
 // Use the GCC extension to use 128-bit indices.
 #ifdef INDICES_128BITS
@@ -123,8 +123,8 @@ private:
 
         struct EqualityVariable_Hash
         {
-            uint32_t operator()(const Minisat::Solver_prop::EqualityVariables & e)  const
-                { return Minisat::hash(e.my_id + e.id);  }
+            uint32_t operator()(const MinisatSTP::Solver_prop::EqualityVariables & e)  const
+                { return MinisatSTP::hash(e.my_id + e.id);  }
         };
 
 
@@ -313,7 +313,7 @@ private:
 public:
     // Constructor/Destructor:
     //
-    Solver_prop();
+    Solver_prop(volatile bool& timeout);
     virtual ~Solver_prop();
 
     // Problem specification:
@@ -484,7 +484,7 @@ protected:
     //
     int64_t             conflict_budget;    // -1 means no budget.
     int64_t             propagation_budget; // -1 means no budget.
-    bool                asynch_interrupt;
+    volatile bool&      asynch_interrupt;
 
     // Main internal methods:
     //

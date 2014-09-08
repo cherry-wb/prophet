@@ -6,7 +6,7 @@
 
 #include "SATSolver.h"
 
-namespace Minisat
+namespace MinisatSTP
 {
    class Solver;
 }
@@ -19,7 +19,7 @@ namespace BEEV
     T * s;
 
   public:
-    MinisatCore();
+    MinisatCore(volatile bool& interrupt);
 
     ~MinisatCore();
 
@@ -33,10 +33,17 @@ namespace BEEV
     bool
     solve(); // Search without assumptions.
 
+    virtual
     bool
     simplify(); // Removes already satisfied clauses.
 
     virtual uint8_t modelValue(Var x) const;
+
+    uint8_t
+    value(Var x) const
+    {
+      return MinisatSTP::toInt(s->value(x));
+    }
 
     virtual Var newVar();
 
@@ -51,6 +58,13 @@ namespace BEEV
     virtual lbool true_literal() {return ((uint8_t)0);}
     virtual lbool false_literal()  {return ((uint8_t)1);}
     virtual lbool undef_literal()  {return ((uint8_t)2);}
+
+    virtual int nClauses();
+
+    bool unitPropagate(const vec_literals& ps)
+    {
+      return s->unitPropagate(ps);
+    }
   };
 }
 ;

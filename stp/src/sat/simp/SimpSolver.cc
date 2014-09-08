@@ -22,7 +22,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "../simp/SimpSolver.h"
 #include "../utils/System.h"
 
-using namespace Minisat;
+using namespace MinisatSTP;
 
 //=================================================================================================
 // Options:
@@ -43,7 +43,8 @@ static DoubleOption opt_simp_garbage_frac(_cat, "simp-gc-frac", "The fraction of
 // Constructor/Destructor:
 
 
-SimpSolver::SimpSolver() :
+SimpSolver::SimpSolver(volatile bool& interrupt) :
+    Solver(interrupt),
     grow               (opt_grow)
   , clause_lim         (opt_clause_lim)
   , subsumption_lim    (opt_subsumption_lim)

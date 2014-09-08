@@ -7,9 +7,9 @@ namespace BEEV
 {
 
   template <class T>
-  MinisatCore<T>::MinisatCore()
+  MinisatCore<T>::MinisatCore(volatile bool& interrupt)
   {
-     s = new T();
+     s = new T(interrupt);
   };
 
   template <class T>
@@ -22,7 +22,7 @@ namespace BEEV
   bool
   MinisatCore<T>::addClause(const SATSolver::vec_literals& ps) // Add a clause to the solver.
   {
-    return s->addClause(ps);
+    s->addClause(ps);
   }
 
   template <class T>
@@ -47,11 +47,11 @@ namespace BEEV
   uint8_t
   MinisatCore<T>::modelValue(Var x) const
   {
-    return Minisat::toInt(s->modelValue(x));
+    return MinisatSTP::toInt(s->modelValue(x));
   }
 
   template <class T>
-  Minisat::Var
+  MinisatSTP::Var
   MinisatCore<T>::newVar()
   {
     return s->newVar();
@@ -60,7 +60,7 @@ namespace BEEV
   template <class T>
   int MinisatCore<T>::setVerbosity(int v)
   {
-    return s->verbosity = v;
+    s->verbosity = v;
   }
 
     template <class T>
@@ -77,8 +77,8 @@ namespace BEEV
   template <class T>
   void MinisatCore<T>::printStats()
     {
-      double cpu_time = Minisat::cpuTime();
-      double mem_used = Minisat::memUsedPeak();
+      double cpu_time = MinisatSTP::cpuTime();
+      double mem_used = MinisatSTP::memUsedPeak();
       printf("restarts              : %"PRIu64"\n", s->starts);
       printf("conflicts             : %-12"PRIu64"   (%.0f /sec)\n", s->conflicts   , s->conflicts   /cpu_time);
       printf("decisions             : %-12"PRIu64"   (%4.2f %% random) (%.0f /sec)\n", s->decisions, (float)s->rnd_decisions*100 / (float)s->decisions, s->decisions   /cpu_time);
@@ -88,9 +88,22 @@ namespace BEEV
       printf("CPU time              : %g s\n", cpu_time);
     }
 
+  template <class T>
+    int MinisatCore<T>::nClauses()
+  {
+    return s->nClauses();
+  }
+
+  template <class T>
+    bool MinisatCore<T>::simplify()
+  {
+    s->simplify();
+  }
+
+
 
   // I was going to make SimpSolver and Solver instances of this template.
   // But I'm not so sure now because I don't understand what eliminate() does in the simp solver.
-  template class MinisatCore<Minisat::Solver>;
-  //template class MinisatCore<Minisat::SimpSolver>;
+  template class MinisatCore<MinisatSTP::Solver>;
+  //template class MinisatCore<MinisatSTP::SimpSolver>;
 };

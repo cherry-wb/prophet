@@ -6,7 +6,7 @@
 
 #include "SATSolver.h"
 
-namespace Minisat
+namespace MinisatSTP
 {
    class MinisatCore_prop;
 }
@@ -19,7 +19,7 @@ namespace BEEV
     T * s;
 
   public:
-    MinisatCore_prop();
+    MinisatCore_prop(volatile bool& timeout);
 
     ~MinisatCore_prop();
 
@@ -30,14 +30,11 @@ namespace BEEV
     okay() const; // FALSE means solver is in a conflicting state
 
     virtual
-    bool addArray(int array_id, const SATSolver::vec_literals& i, const SATSolver::vec_literals& v, const Minisat::vec<Minisat::lbool>&, const Minisat::vec<Minisat::lbool> &);
+    bool addArray(int array_id, const SATSolver::vec_literals& i, const SATSolver::vec_literals& v, const MinisatSTP::vec<MinisatSTP::lbool>&, const MinisatSTP::vec<MinisatSTP::lbool> &);
 
 
     bool
     solve(); // Search without assumptions.
-
-    bool
-    simplify(); // Removes already satisfied clauses.
 
     virtual uint8_t modelValue(Var x) const;
 

@@ -15,8 +15,9 @@
 #include <string>
 #include "../sat/utils/System.h"
 #include <iomanip>
+#include "../boost/noncopyable.hpp"
 
-class RunTimes
+class RunTimes : boost::noncopyable
 {
 public:
   enum Category
@@ -74,7 +75,7 @@ public:
     long val = getCurrentTime();
     s << (val -  lastTime) << "ms" ;
     lastTime = val;
-    s << ":" << std::setiosflags(std::ios::fixed) << std::setprecision(0) << Minisat::memUsed() << "M";
+    s << ":" << std::setiosflags(std::ios::fixed) << std::setprecision(0) << MinisatSTP::memUsed() << "M";
     return s.str();
   }
 

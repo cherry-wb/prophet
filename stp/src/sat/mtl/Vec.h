@@ -27,7 +27,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include "../mtl/IntTypesMtl.h"
 #include "../mtl/XAlloc.h"
 
-namespace Minisat {
+namespace MinisatSTP {
 
 //=================================================================================================
 // Automatically resizable arrays

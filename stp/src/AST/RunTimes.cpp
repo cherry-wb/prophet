@@ -66,8 +66,8 @@ void RunTimes::print()
   std::cerr << std::fixed;
   std::cerr.precision(2);
   std::cerr << "Statistics Total: " << ((double)cummulative_ms)/1000 << "s" << std::endl;
-  std::cerr << "CPU Time Used   : " << Minisat::cpuTime() << "s" << std::endl;
-  std::cerr << "Peak Memory Used: " << Minisat::memUsedPeak() << "MB" << std::endl;
+  std::cerr << "CPU Time Used   : " << MinisatSTP::cpuTime() << "s" << std::endl;
+  std::cerr << "Peak Memory Used: " << MinisatSTP::memUsedPeak() << "MB" << std::endl;
 
   clear();
 

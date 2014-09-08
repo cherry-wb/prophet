@@ -12,6 +12,7 @@
 
 #include "../../extlib-abc/aig.h"
 #include <iostream>
+#include <inttypes.h>
 
 namespace BEEV
 {
@@ -20,7 +21,8 @@ namespace BEEV
 
   // This class wraps around a pointer to an AIG (provided by the ABC tool).
   // uses the default copy constructor and assignment operator.
-class BBNodeAIG
+
+  class BBNodeAIG
 {
   // This is only useful for printing small instances for debuging.
     void print(Aig_Obj_t* node) const
@@ -56,6 +58,12 @@ class BBNodeAIG
         print(c1);
     }
 public:
+
+    intptr_t GetNodeNum() const
+        {
+          return (intptr_t)n;
+        }
+
     // If the pointer is odd. Then it's the NOT of the pointer one less.
 	Aig_Obj_t * n;
 
@@ -89,7 +97,7 @@ public:
 
 	bool operator==(const BBNodeAIG &other) const
 	{
-		return n == other.n;
+	  return n == other.n;
 	}
 
 	bool operator!=(const BBNodeAIG &other) const
