@@ -1,85 +1,86 @@
+/* include/klee/Config/config.h.  Generated from config.h.in by configure.  */
 /* include/klee/Config/config.h.in.  Generated from autoconf/configure.tmp.ac by autoheader.  */
 
 /* Define if stplog enabled */
-#undef ENABLE_STPLOG
+#define ENABLE_STPLOG 0
 
 /* Does the platform use __ctype_b_loc, etc. */
-#undef HAVE_CTYPE_EXTERNALS
+#define HAVE_CTYPE_EXTERNALS 1
 
 /* Using external STP */
-#undef HAVE_EXT_STP
+#define HAVE_EXT_STP 1
 
 /* Define to 1 if you have the <inttypes.h> header file. */
-#undef HAVE_INTTYPES_H
+#define HAVE_INTTYPES_H 1
 
 /* Define to 1 if you have the `stp' library (-lstp). */
-#undef HAVE_LIBSTP
+#define HAVE_LIBSTP 1
 
 /* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
+#define HAVE_MEMORY_H 1
 
 /* Define to 1 if you have the <selinux/selinux.h> header file. */
-#undef HAVE_SELINUX_SELINUX_H
+/* #undef HAVE_SELINUX_SELINUX_H */
 
 /* Define to 1 if you have the <stdint.h> header file. */
-#undef HAVE_STDINT_H
+#define HAVE_STDINT_H 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
-#undef HAVE_STDLIB_H
+#define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the <strings.h> header file. */
-#undef HAVE_STRINGS_H
+#define HAVE_STRINGS_H 1
 
 /* Define to 1 if you have the <string.h> header file. */
-#undef HAVE_STRING_H
+#define HAVE_STRING_H 1
 
 /* Define to 1 if you have the <sys/acl.h> header file. */
-#undef HAVE_SYS_ACL_H
+/* #undef HAVE_SYS_ACL_H */
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
-#undef HAVE_SYS_STAT_H
+#define HAVE_SYS_STAT_H 1
 
 /* Define to 1 if you have the <sys/types.h> header file. */
-#undef HAVE_SYS_TYPES_H
+#define HAVE_SYS_TYPES_H 1
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#undef HAVE_UNISTD_H
+#define HAVE_UNISTD_H 1
 
 /* Path to KLEE's uClibc */
-#undef KLEE_UCLIBC
+#define KLEE_UCLIBC ""
 
 /* LLVM version is release (instead of development) */
-#undef LLVM_IS_RELEASE
+#define LLVM_IS_RELEASE 0
 
 /* LLVM major version number */
-#undef LLVM_VERSION_MAJOR
+#define LLVM_VERSION_MAJOR 3
 
 /* LLVM minor version number */
-#undef LLVM_VERSION_MINOR
+#define LLVM_VERSION_MINOR 2
 
 /* Define to the address where bug reports for this package should be sent. */
-#undef PACKAGE_BUGREPORT
+#define PACKAGE_BUGREPORT "daniel@minormatter.com"
 
 /* Define to the full name of this package. */
-#undef PACKAGE_NAME
+#define PACKAGE_NAME "KLEE"
 
 /* Define to the full name and version of this package. */
-#undef PACKAGE_STRING
+#define PACKAGE_STRING "KLEE 0.01"
 
 /* Define to the one symbol short name of this package. */
-#undef PACKAGE_TARNAME
+#define PACKAGE_TARNAME "-klee-"
 
 /* Define to the home page for this package. */
-#undef PACKAGE_URL
+#define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#undef PACKAGE_VERSION
+#define PACKAGE_VERSION "0.01"
 
 /* Configuration for runtime libraries */
-#undef RUNTIME_CONFIGURATION
+#define RUNTIME_CONFIGURATION "Release"
 
 /* Define to 1 if you have the ANSI C header files. */
-#undef STDC_HEADERS
+#define STDC_HEADERS 1
 
 /* Supporting metaSMT API */
-#undef SUPPORT_METASMT
+#define SUPPORT_METASMT 1

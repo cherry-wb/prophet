@@ -82,6 +82,9 @@ public:
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
                             bool &hasSolution);
+  SolverRunStatus getOperationStatusCode();
+  char *getConstraintLog(const Query& query);
+  void setCoreSolverTimeout(double timeout);
 };
 
 ///
@@ -339,6 +342,17 @@ CexCachingSolver::computeInitialValues(const Query& query,
   }
   
   return true;
+}
+SolverImpl::SolverRunStatus CexCachingSolver::getOperationStatusCode() {
+  return solver->impl->getOperationStatusCode();
+}
+
+char *CexCachingSolver::getConstraintLog(const Query& query) {
+  return solver->impl->getConstraintLog(query);
+}
+
+void CexCachingSolver::setCoreSolverTimeout(double timeout) {
+  solver->impl->setCoreSolverTimeout(timeout);
 }
 
 ///

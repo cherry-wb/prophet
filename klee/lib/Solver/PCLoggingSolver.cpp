@@ -147,6 +147,17 @@ public:
     os << "\n";
     return success;
   }
+  SolverImpl::SolverRunStatus getOperationStatusCode() {
+      return solver->impl->getOperationStatusCode();
+  }
+
+  char *getConstraintLog(const Query& query) {
+    return solver->impl->getConstraintLog(query);
+  }
+
+  void setCoreSolverTimeout(double timeout) {
+    solver->impl->setCoreSolverTimeout(timeout);
+  }
 };
 
 ///

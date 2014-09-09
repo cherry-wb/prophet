@@ -20,6 +20,7 @@
 S2ESRC := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 S2EBUILD:=$(CURDIR)
 LLVMBUILD?=$(S2EBUILD)
+METASMT_ROOT?=/home/wb/work/workspace/metaSMT/build/root
 
 OS := $(shell uname)
 JOBS:=2
@@ -213,7 +214,7 @@ KLEE_CONFIGURE_COMMON = $(S2ESRC)/klee/configure \
                         --target=x86_64 --enable-exceptions \
                         CC=$(CLANG_CC) CXX=$(CLANG_CXX)
 
-KLEE_CONFIGURE_COMMAND = $(KLEE_CONFIGURE_COMMON) --with-stp=$(S2EBUILD)/stp
+KLEE_CONFIGURE_COMMAND = $(KLEE_CONFIGURE_COMMON) --with-stp=$(S2EBUILD)/stp  --with-metasmt=$(METASMT_ROOT)
 
 stamps/klee-debug-configure: stamps/stp-make stamps/llvm-debug-make
 stamps/klee-debug-configure: CONFIGURE_COMMAND = $(KLEE_CONFIGURE_COMMAND) \
@@ -282,7 +283,8 @@ QEMU_COMMON_FLAGS = --prefix=$(S2EBUILD)/opt\
                     $(EXTRA_QEMU_FLAGS)
 
 QEMU_CONFIGURE_FLAGS = --with-stp=$(S2EBUILD)/stp \
-                       $(QEMU_COMMON_FLAGS)
+                       $(QEMU_COMMON_FLAGS) \
+                        --with-metasmt=$(METASMT_ROOT)
 
 QEMU_DEBUG_FLAGS = --with-llvm=$(LLVMBUILD)/llvm-debug/Debug+Asserts \
                    --enable-debug

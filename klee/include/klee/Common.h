@@ -19,9 +19,10 @@
 #include <stdio.h>
 #include <iostream>
 #include <llvm/Support/raw_ostream.h>
-
+#include "klee/Config/config.h"
 // XXX ugh
 namespace klee {
+
   class Solver;
 
   /*

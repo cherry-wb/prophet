@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "klee/Common.h"
-
+#include "klee/CommandLine.h"
 #include "klee/Executor.h"
  
 #include "klee/Context.h"
@@ -83,6 +83,30 @@
 using namespace llvm;
 using namespace klee;
 
+#ifdef SUPPORT_METASMT
+
+#include <metaSMT/frontend/Array.hpp>
+#include <metaSMT/backend/Z3_Backend.hpp>
+#include <metaSMT/backend/Boolector.hpp>
+#include <metaSMT/backend/MiniSAT.hpp>
+#include <metaSMT/DirectSolver_Context.hpp>
+#include <metaSMT/support/run_algorithm.hpp>
+#include <metaSMT/API/Stack.hpp>
+#include <metaSMT/API/Group.hpp>
+
+#define Expr VCExpr
+#define Type VCType
+#define STP STP_Backend
+#include <metaSMT/backend/STP.hpp>
+#undef Expr
+#undef Type
+#undef STP
+
+using namespace metaSMT;
+using namespace metaSMT::solver;
+
+#endif /* SUPPORT_METASMT */
+
 namespace {
   cl::opt<bool>
   DumpStatesOnHalt("dump-states-on-halt",
@@ -121,9 +145,9 @@ namespace {
   MaxSymArraySize("max-sym-array-size",
                   cl::init(0));
 
-  cl::opt<bool>
-  DebugValidateSolver("debug-validate-solver",
-		      cl::init(false));
+//  cl::opt<bool>
+//  DebugValidateSolver("debug-validate-solver",
+//		      cl::init(false));
 
   cl::opt<bool>
   SuppressExternalWarnings("suppress-external-warnings", cl::init(true));
@@ -137,26 +161,10 @@ namespace {
                               cl::init(false));
 
   cl::opt<bool>
-  UseFastCexSolver("use-fast-cex-solver",
-                   cl::init(false));
-
-  cl::opt<bool>
-  UseIndependentSolver("use-independent-solver",
-                       cl::init(true),
-		       cl::desc("Use constraint independence"));
-
-  cl::opt<bool>
   EmitAllErrors("emit-all-errors",
                 cl::init(false),
                 cl::desc("Generate tests cases for all errors "
                          "(default=one per (error,instruction) pair)"));
-
-  //The counter example cache may have bad interactions with
-  //concolic mode. Disabled by default.
-  cl::opt<bool>
-  UseCexCache("use-cex-cache",
-              cl::init(false),
-	      cl::desc("Use counterexample caching"));
 
   cl::opt<bool>
   UseQueryLog("use-query-log",
@@ -173,11 +181,6 @@ namespace {
   cl::opt<bool>
   NoExternals("no-externals", 
            cl::desc("Do not allow external functin calls"));
-
-  cl::opt<bool>
-  UseCache("use-cache",
-           cl::init(true),
-	   cl::desc("Use validity caching"));
 
   cl::opt<bool>
   OnlyReplaySeeds("only-replay-seeds", 
@@ -279,8 +282,6 @@ UseExprSimplifier("use-expr-simplifier",
           cl::desc("Apply expression simplifier for new expressions"),
           cl::init(true));
 
-
-
 unsigned Executor::getMaxMemory() { return MaxMemory; }
 bool Executor::getMaxMemoryInhibit() { return MaxMemoryInhibit; }
 
@@ -291,7 +292,7 @@ namespace klee {
   RNG theRNG;
 }
 
-Solver *constructSolverChain(STPSolver *stpSolver,
+Solver *constructSolverChain(Solver *stpSolver,
                              std::string queryLogPath,
                              std::string stpQueryLogPath,
                              std::string queryPCLogPath,
@@ -329,8 +330,37 @@ void Executor::initializeSolver()
     if (this->solver) {
         delete this->solver;
     }
+    Solver *stpSolver = NULL;
+#ifdef SUPPORT_METASMT
+  if (UseMetaSMT != METASMT_BACKEND_NONE) {
 
-    STPSolver *stpSolver = new STPSolver(UseForkedSTP);
+    std::string backend;
+
+    switch (UseMetaSMT) {
+          case METASMT_BACKEND_STP:
+              backend = "STP";
+              stpSolver = new MetaSMTSolver< DirectSolver_Context < STP_Backend > >(UseForkedSTP);
+              break;
+          case METASMT_BACKEND_Z3:
+              backend = "Z3";
+              stpSolver = new MetaSMTSolver< DirectSolver_Context < Z3_Backend > >(UseForkedSTP);
+              break;
+          case METASMT_BACKEND_BOOLECTOR:
+              backend = "Boolector";
+              stpSolver = new MetaSMTSolver< DirectSolver_Context < Boolector > >(UseForkedSTP);
+              break;
+          default:
+              assert(false);
+              break;
+    };
+    llvm::errs() << "Starting MetaSMTSolver(" << backend << ") ...\n";
+  }
+  else {
+	  stpSolver = new STPSolver(UseForkedSTP);
+  }
+#else
+  stpSolver = new STPSolver(UseForkedSTP);
+#endif /* SUPPORT_METASMT */
     Solver *solver =
       constructSolverChain(stpSolver,
                            interpreterHandler->getOutputFilename("queries.qlog"),
@@ -338,7 +368,7 @@ void Executor::initializeSolver()
                            interpreterHandler->getOutputFilename("queries.pc"),
                            interpreterHandler->getOutputFilename("stp-queries.pc"));
 
-    this->solver = new TimingSolver(solver, stpSolver);
+    this->solver = new TimingSolver(solver);
 }
 
 Executor::Executor(const InterpreterOptions &opts,
@@ -3718,7 +3748,7 @@ void Executor::getConstraintLog(const ExecutionState &state,
                                 bool asCVC) {
     if (asCVC) {
         Query query(state.constraints, ConstantExpr::alloc(0, Expr::Bool));
-        char *log = solver->stpSolver->getConstraintLog(query);
+        char *log = solver->getConstraintLog(query);
         res = std::string(log);
         free(log);
     } else {

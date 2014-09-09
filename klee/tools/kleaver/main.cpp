@@ -19,10 +19,29 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/system_error.h"
+#include "klee/CommandLine.h"
 
 using namespace llvm;
 using namespace klee;
 using namespace klee::expr;
+#ifdef SUPPORT_METASMT
+
+#include <metaSMT/DirectSolver_Context.hpp>
+#include <metaSMT/backend/Z3_Backend.hpp>
+#include <metaSMT/backend/Boolector.hpp>
+
+#define Expr VCExpr
+#define Type VCType
+#define STP STP_Backend
+#include <metaSMT/backend/STP.hpp>
+#undef Expr
+#undef Type
+#undef STP
+
+using namespace metaSMT;
+using namespace metaSMT::solver;
+
+#endif /* SUPPORT_METASMT */
 
 namespace {
   llvm::cl::opt<std::string>
@@ -70,9 +89,9 @@ namespace {
   UseDummySolver("use-dummy-solver",
 		   cl::init(false));
 
-  cl::opt<bool>
-  UseFastCexSolver("use-fast-cex-solver",
-		   cl::init(false));
+//  cl::opt<bool>
+//  UseFastCexSolver("use-fast-cex-solver",
+//		   cl::init(false));
   
   cl::opt<bool>
   UseSTPQueryPCLog("use-stp-query-pc-log",

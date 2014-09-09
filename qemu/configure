@@ -54,7 +54,12 @@ compile_prog_cxx() {
   local_ldflags="$2"
   $cxx $QEMU_CFLAGS $QEMU_CXXFLAGS $local_cxxflags -o $TMPE $TMPCXX $LDFLAGS $local_ldflags > /dev/null 2> /dev/null
 }
-
+compile_prog_cxx_echo() {
+  local_cxxflags="$1"
+  local_ldflags="$2"
+  echo $cxx $QEMU_CFLAGS $QEMU_CXXFLAGS $local_cxxflags -o $TMPE $TMPCXX $LDFLAGS $local_ldflags
+  $cxx $QEMU_CFLAGS $QEMU_CXXFLAGS $local_cxxflags -o $TMPE $TMPCXX $LDFLAGS $local_ldflags > /dev/null 2> /dev/null
+}
 compile_object_cxx() {
   $cxx $QEMU_CFLAGS $QEMU_CXXFLAGS -c -o $TMPO $TMPCXX >> config.log
   $cxx $QEMU_CFLAGS $QEMU_CXXFLAGS -c -o $TMPO $TMPCXX > /dev/null 2> /dev/null
@@ -771,6 +776,8 @@ for opt do
   ;;
   --with-stp=*) stpdir="$optarg"
   ;;
+    --with-metasmt=*) metasmtdir="$optarg"
+  ;;
   --disable-kvm) kvm="no"
   ;;
   --enable-kvm) kvm="yes"
@@ -1159,6 +1166,7 @@ echo "  --enable-s2e             enable S2E"
 echo "  --s2e-ext-plugins-dir    location of the external plugins source folder"
 echo "  --with-klee=PATH         KLEE path (PATH/bin/klee-config must exist)"
 echo "  --with-stp=PATH          STP path (PATH/lib/libstp.a must exist)"
+echo "  --with-metasmt=PATH          STP path (PATH/lib/libmetaSMT.a must exist)"
 echo "  --disable-kvm            disable KVM acceleration support"
 echo "  --enable-kvm             enable KVM acceleration support"
 echo "  --enable-tcg-interpreter enable TCG with bytecode interpreter (TCI)"
@@ -2210,8 +2218,15 @@ EOF
     klee_ldflags="$klee_ldflags -L$stpdir/lib"
     klee_libs="$klee_libs -lstp"
   fi
-
-  if compile_prog_cxx "$klee_cxxflags $llvm_cxxflags" "$klee_ldflags $klee_libs $llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then
+  if test "$metasmtdir" != ""; then
+    metasmtdir=$(cd $metasmtdir>/dev/null && pwd)
+   metasmt_cxxflags=`pkg-config $metasmtdir/lib/pkgconfig/metaSMT.pc --cflags 2> /dev/null`
+   metasmt_libs=`pkg-config $metasmtdir/lib/pkgconfig/metaSMT.pc  --libs 2> /dev/null`
+   klee_cxxflags="$metasmt_cxxflags  $klee_cxxflags  -DBOOST_HAS_GCC_TR1 "
+   klee_libs=" $klee_libs  -lgomp -lboost_iostreams -lboost_thread -lboost_system -lmetaSMT -lz3 -lrt -lboolector -lminisat_core"
+   klee_ldflags=" $klee_ldflags  -L$metasmtdir/lib -L$metasmtdir/../../deps/Z3-4.3.1/lib -L$metasmtdir/../../deps/boolector-1.5.118/lib -L$metasmtdir/../../deps/minisat-git/lib/ -L$metasmtdir/../../deps/boost-1_55_0/lib"
+  fi
+  if compile_prog_cxx_echo "$klee_cxxflags $llvm_cxxflags" "$klee_ldflags $klee_libs $llvm_libs $llvm_ldflags $LDASAN $ASANLIBPATH" ; then
     s2e="yes"
   else
     feature_not_found "klee (required for s2e)"

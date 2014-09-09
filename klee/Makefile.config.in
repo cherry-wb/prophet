@@ -36,6 +36,9 @@ RUNTIME_ENABLE_PROFILING :=
 
 HAVE_PERL := @HAVE_PERL@
 
+ENABLE_METASMT := @ENABLE_METASMT@
+METASMT_ROOT := @METASMT_ROOT@
+
 # A list of "features" which tests can check for in XFAIL:
 TEST_FEATURE_LIST :=
 

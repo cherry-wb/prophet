@@ -82,6 +82,9 @@ public:
     return solver->impl->computeInitialValues(query, objects, values, 
                                               hasSolution);
   }
+  SolverRunStatus getOperationStatusCode();
+  char *getConstraintLog(const Query& query);
+  void setCoreSolverTimeout(double timeout);
 };
 
 /** @returns the canonical version of the given query.  The reference
@@ -233,7 +236,17 @@ bool CachingSolver::computeTruth(const Query& query,
   cacheInsert(query, cachedResult);
   return true;
 }
+SolverImpl::SolverRunStatus CachingSolver::getOperationStatusCode() {
+  return solver->impl->getOperationStatusCode();
+}
 
+char *CachingSolver::getConstraintLog(const Query& query) {
+  return solver->impl->getConstraintLog(query);
+}
+
+void CachingSolver::setCoreSolverTimeout(double timeout) {
+  solver->impl->setCoreSolverTimeout(timeout);
+}
 ///
 
 Solver *klee::createCachingSolver(Solver *_solver) {

@@ -595,6 +595,8 @@ ac_includes_default="\
 #endif"
 
 ac_subst_vars='LTLIBOBJS
+METASMT_ROOT
+ENABLE_METASMT
 LIBOBJS
 STP_ROOT
 ENABLE_EXT_STP
@@ -691,6 +693,7 @@ with_runtime
 enable_stplog
 enable_exceptions
 with_stp
+with_metasmt
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1334,7 +1337,8 @@ Optional Packages:
   --with-runtime          Select build configuration for runtime libraries
                           (default [Release])
   --with-stp              Location of STP installation directory
-
+  --with-metasmt          Location of metaSMT installation directory
+  
 Some influential environment variables:
   CC          C compiler command
   CFLAGS      C compiler flags
@@ -4511,6 +4515,71 @@ $as_echo "#define HAVE_EXT_STP 1" >>confdefs.h
   ENABLE_EXT_STP=1
 
   STP_ROOT=$stp_root
+
+fi
+
+if test "${with_metasmt+set}" = set; then :
+  withval=$with_metasmt;
+fi
+
+
+if test X$with_metasmt = X ; then
+  ENABLE_METASMT=0
+
+else
+  metasmt_root=`cd $with_metasmt 2> /dev/null; pwd`
+
+    old_CPPFLAGS="$CPPFLAGS"
+  old_LDFLAGS="$LDFLAGS"
+  CPPFLAGS="$CPPFLAGS -I$metasmt_root/include"
+  LDFLAGS="$LDFLAGS -L$metasmt_root/lib -lmetaSMT"
+  for ac_header in $metasmt_root/include/metaSMT/DirectSolver_Context.hpp $metasmt_root/include/metaSMT/frontend/QF_BV.hpp
+do :
+  as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
+ac_fn_cxx_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
+if eval test \"x\$"$as_ac_Header"\" = x"yes"; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+else
+
+         as_fn_error $? "Unable to use $metasmt_root/include/metaSMT/DirectSolver_Context.hpp header" "$LINENO" 5
+
+fi
+
+done
+
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include $metasmt_root/include/metaSMT/frontend/QF_BV.hpp
+int
+main ()
+{
+metaSMT::logic::QF_BV::new_bitvector(3)
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for new_bitvector() in -lmetaSMT" >&5
+$as_echo_n "checking for new_bitvector() in -lmetaSMT... " >&6; }
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  CPPFLAGS="$old_CPPFLAGS"
+  LDFLAGS="$old_LDFLAGS"
+
+
+$as_echo "#define SUPPORT_METASMT 1" >>confdefs.h
+
+  ENABLE_METASMT=1
+
+  METASMT_ROOT=$metasmt_root
+
+  REQUIRES_RTTI=1
 
 fi
 

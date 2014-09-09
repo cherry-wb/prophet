@@ -284,6 +284,9 @@ public:
     return solver->impl->computeInitialValues(query, objects, values,
                                               hasSolution);
   }
+  SolverRunStatus getOperationStatusCode();
+  char *getConstraintLog(const Query&);
+  void setCoreSolverTimeout(double timeout);
 };
   
 bool IndependentSolver::computeValidity(const Query& query,
@@ -312,7 +315,17 @@ bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
   ConstraintManager tmp(required);
   return solver->impl->computeValue(Query(tmp, query.expr), result);
 }
+SolverImpl::SolverRunStatus IndependentSolver::getOperationStatusCode() {
+  return solver->impl->getOperationStatusCode();
+}
 
+char *IndependentSolver::getConstraintLog(const Query& query) {
+  return solver->impl->getConstraintLog(query);
+}
+
+void IndependentSolver::setCoreSolverTimeout(double timeout) {
+  solver->impl->setCoreSolverTimeout(timeout);
+}
 Solver *klee::createIndependentSolver(Solver *s) {
   return new Solver(new IndependentSolver(s));
 }

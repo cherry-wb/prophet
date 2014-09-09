@@ -630,6 +630,12 @@ public:
 
   Expr::Width getDomain() const { return Expr::Int32; }
   Expr::Width getRange() const { return Expr::Int8; }
+
+  unsigned computeHash();
+  unsigned hash() const { return hashValue; }
+
+private:
+  unsigned hashValue;
 };
 
 /// Class representing a complete list of updates into an array.

@@ -473,7 +473,13 @@ Array::~Array() {
     stpInitialArray = 0;
   }
 }
-
+unsigned Array::computeHash() {
+  unsigned res = 0;
+  for (unsigned i = 0, e = name.size(); i != e; ++i)
+    res = (res * Expr::MAGIC_HASH_CONSTANT) + name[i];
+  hashValue = res;
+  return hashValue;
+}
 /***/
 
 ref<Expr> ReadExpr::create(const UpdateList &ul, ref<Expr> index) {

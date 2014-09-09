@@ -11,6 +11,7 @@
 #define KLEE_SOLVER_H
 
 #include "klee/Expr.h"
+#include "klee/Config/config.h"
 
 #include <vector>
 
@@ -148,6 +149,9 @@ namespace klee {
     //
     // FIXME: This should go into a helper class, and should handle failure.
     virtual std::pair< ref<Expr>, ref<Expr> > getRange(const Query&);
+
+    virtual char *getConstraintLog(const Query& query);
+    virtual void setCoreSolverTimeout(double timeout);
   };
 
   /// STPSolver - A complete solver based on STP.
@@ -167,9 +171,22 @@ namespace klee {
     
     /// setTimeout - Set constraint solver timeout delay to the given value; 0
     /// is off.
-    void setTimeout(double timeout);
+    virtual void setCoreSolverTimeout(double timeout);
   };
 
+#ifdef SUPPORT_METASMT
+
+  template<typename SolverContext>
+  class MetaSMTSolver : public Solver {
+  public:
+    MetaSMTSolver(bool useForked, bool optimizeDivides=true);
+    virtual ~MetaSMTSolver();
+
+    virtual char *getConstraintLog(const Query&);
+    virtual void setCoreSolverTimeout(double timeout);
+};
+
+#endif /* SUPPORT_METASMT */
   /* *** */
 
   /// createValidatingSolver - Create a solver which will validate all query

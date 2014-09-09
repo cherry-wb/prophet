@@ -28,6 +28,14 @@ namespace klee {
     SolverImpl() {}
     virtual ~SolverImpl();
 
+    enum SolverRunStatus { SOLVER_RUN_STATUS_SUCCESS_SOLVABLE,
+                           SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE,
+                           SOLVER_RUN_STATUS_FAILURE,
+                           SOLVER_RUN_STATUS_TIMEOUT,
+                           SOLVER_RUN_STATUS_FORK_FAILED,
+                           SOLVER_RUN_STATUS_INTERRUPTED,
+                           SOLVER_RUN_STATUS_UNEXPECTED_EXIT_CODE,
+                           SOLVER_RUN_STATUS_WAITPID_FAILED };
     /// computeValidity - Compute a full validity result for the
     /// query.
     ///
@@ -56,6 +64,21 @@ namespace klee {
                                       std::vector< std::vector<unsigned char> > 
                                         &values,
                                       bool &hasSolution) = 0;  
+
+    /// getOperationStatusCode - get the status of the last solver operation
+    virtual SolverRunStatus getOperationStatusCode() = 0;
+
+    /// getOperationStatusString - get string representation of the operation
+    /// status code
+    static const char* getOperationStatusString(SolverRunStatus statusCode);
+
+    virtual char *getConstraintLog(const Query& query)  {
+        // dummy
+        return(NULL);
+    }
+
+    virtual void setCoreSolverTimeout(double timeout) {};
+
 };
 
 }
