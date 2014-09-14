@@ -41,7 +41,8 @@
 #include <s2e/s2e_qemu.h>
 
 #include <algorithm>
-
+#include <s2e/S2EExecutor.h>
+#include <string>
 using namespace std;
 
 namespace s2e {
@@ -275,8 +276,12 @@ int WindowsImage::InitImports(S2EExecutionState *state)
     }
 
     if (!state->readMemoryConcrete(ImportTableAddress, ImportDescriptors, ImportTableSize)) {
-        s2e_debug_print("Could not load IMAGE_IMPORT_DESCRIPTOR structures (base=%#"PRIx64")\n", ImportTableAddress);
+    	s2e_debug_print("Could not load IMAGE_IMPORT_DESCRIPTOR structures (base=%#"PRIx64") (tablesize=%#"PRIx64")\n", ImportTableAddress,ImportTableSize);
         free(ImportDescriptors);
+        if(ImportTableAddress>0x7c800000){
+        	throw CpuExitException(1,ImportTableAddress);
+        }
+        state->m_OSPageNeedToSwap.insert(std::make_pair(ImportTableAddress,ImportTableAddress));
         return -6;
     }
 
@@ -285,6 +290,7 @@ int WindowsImage::InitImports(S2EExecutionState *state)
         string DllName;
 
         if (!state->readString(ImportDescriptors[i].Name + m_Base, DllName)) {
+        	state->m_OSPageNeedToSwap.insert(std::make_pair((ImportDescriptors[i].Name + m_Base),(ImportDescriptors[i].Name + m_Base)));
             continue;
         }
         if (!IsValidString(DllName.c_str())) {
@@ -306,37 +312,50 @@ int WindowsImage::InitImports(S2EExecutionState *state)
             res2 = state->readMemoryConcrete(ImportNameTable+j*sizeof(s2e::windows::IMAGE_THUNK_DATA32),
                 &INaT, sizeof(INaT));
 
-            if (!res1 || !res2) {
-                s2e_debug_print("Could not load IAT entries\n");
-                free(ImportDescriptors);
-                return -7;
-            }
+            if (!res1 ) {
+				  s2e_debug_print("Could not load IAT entries\n");
+				  free(ImportDescriptors);
+				  throw CpuExitException(1,ImportAddressTable+j*sizeof(s2e::windows::IMAGE_THUNK_DATA32));
+				  return -7;
+			  }
+			  if(!res2){
+				  s2e_debug_print("Could not load INAT entries\n");
+				  free(ImportDescriptors);
+				  throw CpuExitException(1,ImportNameTable+j*sizeof(s2e::windows::IMAGE_THUNK_DATA32));
+				  return -7;
+			  }
 
             if (!INaT.u1.AddressOfData)
                 break;
 
+            string FunctionName;
             if (INaT.u1.AddressOfData & IMAGE_ORDINAL_FLAG) {
                 uint32_t Tmp = INaT.u1.AddressOfData & ~0xFFFF;
                 Tmp &= ~IMAGE_ORDINAL_FLAG;
-                if (!Tmp) {
+                if(!Tmp && (DllName == "WS2_32.dll" || DllName == "ws2_32.dll") ){
+						uint32 ordinal = (INaT.u1.Ordinal & ~IMAGE_ORDINAL_FLAG);
+						std::stringstream ss(FunctionName);
+						ss <<  ordinal;
+						FunctionName = ss.str();
+						//FunctionName = string(ordinal);
+				   }else if (!Tmp) {
                     s2e_debug_print("Does not support import by ordinals\n");
                     break;
-                }
+				   }
             }else {
-                INaT.u1.AddressOfData += m_Base;
-            }
+            	INaT.u1.AddressOfData += m_Base;
+				Name = INaT.u1.AddressOfData;
 
-            string FunctionName;
-            Name = INaT.u1.AddressOfData;
+				if (Name < m_Base || Name >= m_Base + m_ImageSize) {
+					j++;
+					continue;
+				}
 
-            if (Name < m_Base || Name >= m_Base + m_ImageSize) {
-                j++;
-                continue;
-            }
-
-            if (!state->readString(Name+2, FunctionName)) {
-                j++;
-                continue;
+				if (!state->readString(Name + 2, FunctionName)) {
+					j++;
+					throw CpuExitException(1, Name + FunctionName.length() + 2);
+					continue;
+				}
             }
 
             if (!IsValidString(FunctionName.c_str())) {

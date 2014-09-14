@@ -32,85 +32,40 @@
  *
  * All contributors are listed in the S2E-AUTHORS file.
  */
-
-#ifndef __WINDOWS_UM_INTERCEPTOR_H__
-
-#define __WINDOWS_UM_INTERCEPTOR_H__
-
-#include <s2e/Plugins/ModuleDescriptor.h>
-
-#include <s2e/Plugin.h>
-#include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/OSMonitor.h>
-#include <s2e/Plugins/ModuleExecutionDetector.h>
-
-#include "WindowsMonitor.h"
+#include <s2e/Plugins/EXT/HeapMonitor.h>
+#include <set>
 
 namespace s2e {
 namespace plugins {
-
-class WindowsUmInterceptor
-{
-private:
-  WindowsMonitor *m_Os;
-  ModuleExecutionDetector *m_detector;
-
-  typedef std::set<ModuleDescriptor*> HookedLibrarySet;
-  typedef std::set<std::string> StringSet;
-
-
-  uint64_t m_ASBase;
-  uint64_t m_ASSize;
-  
-  enum EUmTracingState {
-    SEARCH_PROCESS,
-    WAIT_PROCESS_INIT,
-    WAIT_LIBRARY_LOAD,
-    LOAD_DONE
-  };
-
-  enum EUmTracingState m_TracingState;
-
-  uint64_t m_Cr3;
-  uint64_t m_PrevCr3;
-  uint64_t m_HookedCr3;
-  uint64_t m_LdrAddr; 
-  uint64_t m_ProcBase;
-  
-  ModuleDescriptor::MDSet m_LoadedLibraries;
-
-  //IDataStructureSpy::Processes m_ProcList;
-
-  std::string m_ProcessName;
-  std::map<std::string, ModuleDescriptor> m_Modules;
-
-  bool WaitForProcessInit(S2EExecutionState *state);
-  bool FindModules(S2EExecutionState *State);
-  bool InitImports();
-
-  void NotifyLoadedProcesses(S2EExecutionState *state);
-  void NotifyModuleLoad(S2EExecutionState *state, ModuleDescriptor &Library);
-
-  bool CatchModuleUnloadBase(S2EExecutionState *State, uint64_t pLdrEntry);
-  bool CatchModuleUnloadServer2008(S2EExecutionState *State);
-  bool CatchModuleUnloadXPSP3(S2EExecutionState *State);
-
-  bool CatchProcessTerminationXp(S2EExecutionState *State);
-  bool CatchProcessTerminationServer2008(S2EExecutionState *State);
-
-public:
-  WindowsUmInterceptor(WindowsMonitor *Monitor);
-  virtual ~WindowsUmInterceptor();
-
-  bool CatchModuleLoad(S2EExecutionState *State);
-  bool CatchProcessTermination(S2EExecutionState *State);
-  bool CatchModuleUnload(S2EExecutionState *State);
-  
-  bool GetPids(S2EExecutionState *State, PidSet &out);
-};
-
+S2E_DEFINE_PLUGIN(HeapMonitor, "Track Heap memory usage",
+		"HeapMonitor", "ModuleExecutionDetector", "Interceptor");
+HeapMonitor::HeapMonitor(S2E* s2e): Plugin(s2e) {
 
 }
-}
+ void HeapMonitor::HeapCreate(S2EExecutionState* state,uint32_t hreturn, uint32_t flOptions, uint32_t dwInitialSize, uint32_t dwMaximumSize) {
 
-#endif
+}
+  void HeapMonitor::HeapDestroy(S2EExecutionState* state,uint32_t hHeap) {
+
+ }
+  void HeapMonitor::HeapReAlloc(S2EExecutionState* state,uint32_t hreturn, uint32_t hHeap, uint32_t dwFlags,uint32_t lpMem,uint32_t dwBytes) {
+
+ }
+  void HeapMonitor::HeapAlloc(S2EExecutionState* state,uint32_t hreturn, uint32_t hHeap, uint32_t dwFlags,uint32_t dwBytes){
+
+ }
+  void HeapMonitor::HeapFree(S2EExecutionState* state,uint32_t hHeap,uint32_t dwFlags,uint32_t lpMem) {
+
+ }
+  bool HeapMonitor::getHeapBlockInfo(S2EExecutionState *state, uint64_t accessaddress, HeapBlockInfo &info) const {
+		return false;
+ }
+  void HeapMonitor::dump(S2EExecutionState *state){
+
+ }
+  std::stringstream& HeapMonitor::dump(S2EExecutionState *state,std::stringstream &os,bool issimplify) {
+	 return os;
+ }
+} // namespace plugins
+} // namespace s2e
+

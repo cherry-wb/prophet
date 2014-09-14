@@ -188,7 +188,7 @@ bool WindowsKmInterceptor::GetDriverDescriptor(S2EExecutionState *state,
 
 bool WindowsKmInterceptor::CatchModuleLoad(S2EExecutionState *state)
 {
-    assert(m_Os->GetVersion() == WindowsMonitor::XPSP3);
+	assert((m_Os->GetVersion() == WindowsMonitor::XPSP3) ||(m_Os->GetVersion() == WindowsMonitor::XPSP3CN)  ||(m_Os->GetVersion() == WindowsMonitor::WIN7X86));
 
     uint64_t pDriverObject=0;
 

@@ -47,7 +47,7 @@
 #include <s2e/Plugins/SymbolicHardware.h>
 
 #include <s2e/Plugins/WindowsInterceptor/WindowsImage.h>
-
+#include <s2e/Plugins/EXT/HeapMonitor.h>
 #include "Api.h"
 #include "Ntddk.h"
 
@@ -137,6 +137,18 @@ private:
 public:
     DECLARE_ENTRY_POINT_CALL(DriverDispatch, uint32_t irpMajor);
     DECLARE_ENTRY_POINT_RET(DriverDispatch, uint32_t irpMajor, bool isFake, uint32_t pIrp);
+
+   DECLARE_ENTRY_POINT(RtlCreateHeap, uint32_t flOptions, uint32_t ReserveSize, uint32_t CommitSize);
+   DECLARE_ENTRY_POINT(RtlAllocateHeap,uint32_t hHeap, uint32_t dwFlags,uint32_t dwBytes);
+   DECLARE_ENTRY_POINT(RtlFreeHeap,uint32_t hHeap,uint32_t dwFlags,uint32_t lpMem);
+   DECLARE_ENTRY_POINT(RtlDestroyHeap,uint32_t hHeap);
+   DECLARE_ENTRY_POINT(IoGetCurrentProcess);
+
+   bool m_showDebugInfo;
+   bool m_processIoGetCurrentProcess;
+   uint64_t m_posoffset;
+   HeapMonitor* m_heapMonitor;
+
 };
 
 

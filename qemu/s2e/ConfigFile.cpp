@@ -38,7 +38,7 @@ extern "C" {
 #include <cpu-all.h>
 #include <exec-all.h>
 #include "cpu.h"
-
+#include <disas.h>
 extern CPUArchState *env;
 }
 
@@ -49,10 +49,12 @@ extern CPUArchState *env;
 #include <s2e/S2E.h>
 #include <s2e/S2EExecutionState.h>
 #include <s2e/S2EExecutor.h>
+#include <s2e/Plugins/StackMonitor.h>
+#include <s2e/Plugins/EXT/HeapMonitor.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <sstream>
-
+#include <iostream>
 extern "C" {
 #include <lua.h>
 #include <lauxlib.h>
@@ -251,8 +253,9 @@ T ConfigFile::getValueT(const std::string& name, const T& def, bool *ok)
   
     if(luaL_loadstring(m_luaState, expr.c_str()) ||
                     lua_pcall(m_luaState, 0, 1, 0)) {
-        luaWarning("Can not get configuration value '%s':\n    %s\n",
-                    name.c_str(), lua_tostring(m_luaState, -1));
+    	if(!strstr(name.c_str(),"so_path"))
+    		luaWarning("Can not get configuration value '%s':\n    %s\n",
+    				name.c_str(), lua_tostring(m_luaState, -1));
         lua_pop(m_luaState, 1);
         if(ok) *ok = false;
         return def;
@@ -262,7 +265,7 @@ T ConfigFile::getValueT(const std::string& name, const T& def, bool *ok)
     bool _ok = getLuaValue(&res, def, -1);
     if(ok) *ok = _ok;
   
-    if(!_ok) {
+    if(!_ok && !strstr(name.c_str(),"so_path")) {
         luaWarning("Can not get configuration value '%s':\n    "
                 "value of type %s can not be converted to %s\n",
                 name.c_str(), lua_typename(m_luaState,
@@ -409,6 +412,24 @@ Lunar<S2ELUAExecutionState>::RegType S2ELUAExecutionState::methods[] = {
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, writeMemory),
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, isSpeculative),
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getID),
+
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, readParameterSymb),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, readMemorySymb),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, isForkingEnabled),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, isRunningConcrete),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, isSymbolicExecutionEnabled), //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getSp),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getDisasm),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getFileName),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, searchMemory),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, dumpInfo),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setTranslateStartAndEnd),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setExecuteStartAndEnd),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getTranslateStartAndEnd),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getExecuteStartAndEnd),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, searchFirstSymMemory),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setMainProcess),
+
   {0,0}
 };
 
@@ -420,7 +441,10 @@ S2ELUAExecutionState::S2ELUAExecutionState(lua_State *L)
 
 S2ELUAExecutionState::S2ELUAExecutionState(S2EExecutionState *s)
 {
-    m_state = s;
+	 if (s) {
+		m_state = s;
+		m_id = s->getID();
+	}
     g_s2e->getDebugStream() << "Creating S2ELUAExecutionState" << '\n';
 }
 
@@ -516,6 +540,41 @@ uint64_t S2ELUAExecutionState::readParameterCdecl(lua_State *L, uint32_t param)
     return val;
 }
 
+int S2ELUAExecutionState::readParameterSymb(lua_State *L)
+{
+    uint32_t param = luaL_checkint(L, 1);
+
+    g_s2e->getDebugStream() << "S2ELUAExecutionState: Reading Symb parameter " << param
+            << " from stack" << '\n';
+
+    uint32_t size = sizeof (uint32_t);
+    target_ulong sp = m_state->getSp() + (param + 1) * size;
+    try {
+		uint32_t address = sp;
+		klee::ref<klee::Expr> symValue;
+		if (size == 4) {
+			symValue = m_state->readMemory(address, klee::Expr::Int32);
+		} else if (size == 1) {
+			symValue = m_state->readMemory(address, klee::Expr::Int8);
+		} else if (size == 2) {
+			symValue = m_state->readMemory(address, klee::Expr::Int16);
+		} else {
+			symValue = klee::ref<klee::Expr>(0);
+		}
+		if (symValue.isNull()) {
+			lua_pushstring(L, "error");
+		} else {
+			std::string expstr;
+			llvm::raw_string_ostream exps(expstr);
+			exps << symValue;
+			lua_pushstring(L, exps.str().c_str());
+		}
+	} catch (...) {
+		lua_pushstring(L, "error");
+		return 1;
+	}
+    return 1;
+}
 // Writes a concrete value to the stack
 // XXX Not correct for function parameters for 32 bit linux kernel
 int S2ELUAExecutionState::writeParameter(lua_State *L)
@@ -599,6 +658,339 @@ bool S2ELUAExecutionState::writeParameterAAPCS(lua_State *L, uint32_t param, uin
     }
 #endif
     return false;
+}
+int S2ELUAExecutionState::readMemorySymb(lua_State *L) {
+	try {
+		uint32_t address = luaL_checkint(L, 1);
+		uint32_t type = 4;
+		if (lua_isnumber(L, 2)) {
+			type = luaL_checkint(L, 2);
+		}
+		klee::ref<klee::Expr> symValue;
+		if (type == 4) {
+			symValue = m_state->readMemory(address, klee::Expr::Int32);
+		} else if (type == 1) {
+			symValue = m_state->readMemory(address, klee::Expr::Int8);
+		} else if (type == 2) {
+			symValue = m_state->readMemory(address, klee::Expr::Int16);
+		} else {
+			symValue = klee::ref<klee::Expr>(0);
+		}
+		if (symValue.isNull()) {
+			lua_pushstring(L, "error");
+		} else {
+			std::string expstr;
+			llvm::raw_string_ostream exps(expstr);
+			exps << symValue;
+			lua_pushstring(L, exps.str().c_str());
+		}
+	} catch (...) {
+		lua_pushstring(L, "error");
+		return 1;
+	}
+	return 1;
+}
+int S2ELUAExecutionState::setExecuteStartAndEnd(lua_State *L){
+	uint32_t startaddress = luaL_checkint(L, 1);
+	uint32_t endaddress = luaL_checkint(L, 2);
+	try{
+		g_s2e->setExecuteWatchStart(startaddress);
+		g_s2e->setExecuteWatchEnd(endaddress);
+	}catch(...){
+		return -1;
+	}
+	return 0;
+}
+int S2ELUAExecutionState::setMainProcess(lua_State *L){
+	//uint64_t pid = luaL_checkint(L, 1);
+	try{
+//		setMainmoduleIndentity
+//		g_s2e->setMainmoduleIndentity(pid);
+	}catch(...){
+		return -1;
+	}
+	return 0;
+}
+
+int S2ELUAExecutionState::getExecuteStartAndEnd(lua_State *L){
+	uint64_t startaddress = 0;
+	uint64_t endaddress = 0;
+	try{
+		startaddress  = g_s2e->getExecuteWatchStart();
+		endaddress = g_s2e->getExecuteWatchEnd();
+	}catch(...){
+		return -1;
+	}
+	lua_pushnumber(L, startaddress);
+	lua_pushnumber(L, endaddress);
+	return 2;
+}
+int S2ELUAExecutionState::getTranslateStartAndEnd(lua_State *L){
+	uint32_t startaddress = 0;
+	uint32_t endaddress = 0;
+	try{
+		startaddress = g_s2e->getTranslateWatchStart();
+		endaddress = g_s2e->getTranslateWatchEnd();
+	}catch(...){
+		return -1;
+	}
+	lua_pushnumber(L, startaddress);
+	lua_pushnumber(L, endaddress);
+	return 2;
+}
+int S2ELUAExecutionState::setTranslateStartAndEnd(lua_State *L){
+	uint32_t startaddress = luaL_checkint(L, 1);
+	uint32_t endaddress = luaL_checkint(L, 2);
+	try{
+		g_s2e->setTranslateWatchStart(startaddress);
+		g_s2e->setTranslateWatchEnd(endaddress);
+	}catch(...){
+		return -1;
+	}
+	return 0;
+}
+int S2ELUAExecutionState::dumpInfo(lua_State *L){
+	uint32_t infotype  = luaL_checkint(L, 1);
+	//--0表示栈帧，1表示堆信息
+	std::stringstream ss;
+	std::stringstream sss;
+	if(infotype == 0){
+		s2e::plugins::StackMonitor *m_stackMonitor = static_cast<s2e::plugins::StackMonitor*>(g_s2e->getPlugin("StackMonitor"));
+		if(m_stackMonitor){
+			sss <<  m_stackMonitor->dump(m_state,ss).str();
+			lua_pushstring(L, sss.str().c_str());
+		}else{
+			lua_pushstring(L, "");
+		}
+	}else if(infotype == 1){
+			s2e::plugins::HeapMonitor *m_heapMonitor = static_cast<s2e::plugins::HeapMonitor*>(g_s2e->getPlugin("HeapMonitor"));
+			if(m_heapMonitor){
+				sss <<  m_heapMonitor->dump(m_state,ss).str();
+				lua_pushstring(L, sss.str().c_str());
+			}else{
+				lua_pushstring(L, "");
+			}
+	}else{
+		lua_pushstring(L, "");
+	}
+	return 1;
+}
+int S2ELUAExecutionState::searchMemory(lua_State *L) {
+	uint32_t startaddress = luaL_checkint(L, 1);
+	uint32_t endaddress = luaL_checkint(L, 2);
+	std::string searchstr = luaL_checkstring(L, 3); //以十六进制表示的字符串 因此每两个一个字节 这个的长度一定是双数
+	uint32_t searchresult = 0; //存放匹配到的第一个内存地址
+	std::stringstream ss;
+	uint32_t nextstart = startaddress;
+	uint32_t datalength = searchstr.length() / 2;
+	uint32_t ret;
+	std::deque<uint32_t> searchdata; //deque
+	for (uint32_t currentdataindex = 0; currentdataindex < datalength;
+			++currentdataindex) {
+		uint32_t currentdata=0;
+		std::string high = searchstr.substr(currentdataindex * 2, 1);
+		std::string low = searchstr.substr(currentdataindex * 2 + 1, 1);
+		if (high == "0") {
+			currentdata = 0;
+			currentdata = currentdata << 4;
+		} else if (high == "1") {
+			currentdata = 1;
+			currentdata = currentdata << 4;
+		}else if (high == "2") {
+			currentdata = 2;
+			currentdata = currentdata << 4;
+		}else if (high == "3") {
+			currentdata = 3;
+			currentdata = currentdata << 4;
+		}else if (high == "4") {
+			currentdata = 4;
+			currentdata = currentdata << 4;
+		}else if (high == "5") {
+			currentdata = 5;
+			currentdata = currentdata << 4;
+		}else if (high == "6") {
+			currentdata = 6;
+			currentdata = currentdata << 4;
+		}else if (high == "7") {
+			currentdata = 7;
+			currentdata = currentdata << 4;
+		}else if (high == "8") {
+			currentdata = 8;
+			currentdata = currentdata << 4;
+		}else if (high == "9") {
+			currentdata = 9;
+			currentdata = currentdata << 4;
+		}else if (high == "A"|| high == "a") {
+			currentdata = 10;
+			currentdata = currentdata << 4;
+		}else if (high == "B"|| high == "b") {
+			currentdata = 11;
+			currentdata = currentdata << 4;
+		}else if (high == "C"|| high == "c") {
+			currentdata = 12;
+			currentdata = currentdata << 4;
+		}else if (high == "D"|| high == "d") {
+			currentdata = 13;
+			currentdata = currentdata << 4;
+		}else if (high == "E"|| high == "e") {
+			currentdata = 14;
+			currentdata = currentdata << 4;
+		}else if (high == "F" || high == "f" ) {
+			currentdata = 15;
+			currentdata = currentdata << 4;
+		}
+		if (low == "0") {
+			currentdata = currentdata + 0;
+		} else if (low == "1") {
+			currentdata = currentdata + 1;
+		}else if (low == "2") {
+			currentdata = currentdata + 2;
+		}else if (low == "3") {
+			currentdata = currentdata + 3;
+		}else if (low == "4") {
+			currentdata = currentdata + 4;
+		}else if (low == "5") {
+			currentdata = currentdata + 5;
+		}else if (low == "6") {
+			currentdata = currentdata + 6;
+		}else if (low == "7") {
+			currentdata = currentdata + 7;
+		}else if (low == "8") {
+			currentdata = currentdata + 8;
+		}else if (low == "9") {
+			currentdata = currentdata + 9;
+		}else if (low == "A" || low == "a"  ) {
+			currentdata = currentdata + 10;
+		}else if (low == "B" || low == "b" ) {
+			currentdata = currentdata + 11;
+		}else if (low == "C" || low == "c" ) {
+			currentdata = currentdata + 12;
+		}else if (low == "D" || low == "d" ) {
+			currentdata = currentdata + 13;
+		}else if (low == "E" || low == "e" ) {
+			currentdata = currentdata + 14;
+		}else if (low == "F" || low == "f" ) {
+			currentdata = currentdata + 15;
+		}
+		searchdata.push_back(currentdata);
+	}
+	try {
+		do {
+			bool found = true;
+			if((nextstart % 0x10000)==0){
+				g_s2e->getDebugStream() << "searchMemory: rangestart:"
+							<< hexval(nextstart) << " rangeend:"<<hexval(nextstart+0x10000) <<"\n" ;
+			}
+			uint32_t comparestart = nextstart;
+			for (uint32_t currentdataindex = 0; currentdataindex < datalength;
+					++currentdataindex) {
+				ret = 0;
+				if (m_state->readMemoryConcrete(comparestart + currentdataindex,
+						&ret, 1,S2EExecutionState::VirtualAddress)) {
+
+						if (ret != searchdata.at(currentdataindex)) {
+						found = false;
+						nextstart = nextstart + 1;
+						break;
+					}
+				} else {
+					found = false;
+					nextstart = nextstart + 1;
+					break;
+				}
+			}
+			if (found) {
+				break;
+			}
+		} while (nextstart < endaddress);
+
+		if (nextstart <= endaddress) {
+			searchresult = nextstart;
+		} else {
+			searchresult = 0;
+		}
+		ss << hexval(searchresult);
+		lua_pushstring(L, ss.str().c_str());
+	} catch (...) {
+		searchresult = -1;
+		ss << hexval(searchresult);
+		lua_pushstring(L, ss.str().c_str());
+		return 1;
+	}
+	return 1;
+}
+int S2ELUAExecutionState::searchFirstSymMemory(lua_State *L) {
+	uint32_t startaddress = luaL_checkint(L, 1);
+	uint32_t endaddress = luaL_checkint(L, 2);
+	uint32_t nextstart = startaddress;
+	uint32_t searchresult = startaddress;
+	std::stringstream ss;
+	klee::ref<klee::Expr> symValue;
+	try {
+		do {
+			bool found = false;
+			if((nextstart % 0x10000)==0){
+				g_s2e->getDebugStream() << "searchFirstSymMemory: rangestart:"
+							<< hexval(nextstart) << " rangeend:"<<hexval(nextstart+0x10000) <<"\n" ;
+			}
+			try {
+				symValue = m_state->readMemory(nextstart, klee::Expr::Int8);
+				if (!symValue.isNull() && !isa < klee::ConstantExpr > (symValue)) {
+					found = true;
+				}
+			} catch (...) {
+			}
+			if (found) {
+				break;
+			}
+			nextstart = nextstart + 1;
+		} while (nextstart < endaddress);
+
+		if (nextstart <= endaddress) {
+			searchresult = nextstart;
+		} else {
+			searchresult = 0;
+		}
+		ss << hexval(searchresult);
+		lua_pushstring(L, ss.str().c_str());
+	} catch (...) {
+		return 1;
+	}
+	return 1;
+}
+int S2ELUAExecutionState::isForkingEnabled(lua_State *L) {
+	lua_pushboolean(L, m_state->isForkingEnabled()); /* first result */
+	return 1;
+}
+int S2ELUAExecutionState::isRunningConcrete(lua_State *L) {
+	lua_pushboolean(L, m_state->isRunningConcrete()); /* first result */
+	return 1;
+}
+int S2ELUAExecutionState::isSymbolicExecutionEnabled(lua_State *L) {
+	lua_pushboolean(L, m_state->isSymbolicExecutionEnabled()); /* first result */
+	return 1;
+}
+int S2ELUAExecutionState::getSp(lua_State *L) {
+	lua_pushnumber(L, m_state->getSp()); /* first result */
+	return 1;
+}
+int S2ELUAExecutionState::getDisasm(lua_State *L) {
+	std::string regstr = luaL_checkstring(L, 1);
+	uint32_t _size = luaL_checkint(L, 2);
+	uint32_t _flag = luaL_checkint(L, 3);
+	FILE *m_dissamfile;
+	m_dissamfile = fopen(g_s2e->getOutputFilename(regstr).c_str(), "a+");
+	if (!m_dissamfile) {
+		perror(regstr.c_str());
+	}
+	target_disas(m_dissamfile, m_state->getPc(), _size, _flag);
+	fclose(m_dissamfile);
+	return 1;
+}
+int S2ELUAExecutionState::getFileName(lua_State *L) {
+	std::string namestr = luaL_checkstring(L, 1);
+	lua_pushstring(L, g_s2e->getOutputFilename(namestr).c_str());
+	return 1;
 }
 
 int S2ELUAExecutionState::readMemory(lua_State *L)

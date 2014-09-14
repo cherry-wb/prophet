@@ -50,6 +50,7 @@ extern "C" {
 #include "KernelModeInterceptor.h"
 
 #include <s2e/Plugins/WindowsApi/Ntddk.h>
+#include <s2e/S2EExecutor.h>
 
 #include <string>
 #include <cstring>
@@ -66,52 +67,55 @@ S2E_DEFINE_PLUGIN(WindowsMonitor, "Plugin for monitoring Windows kernel/user-mod
 
 //These are the keys to specify in the configuration file
 const char *WindowsMonitor::s_windowsKeys[] =    {"XPSP2", "XPSP3",
-                                         "XPSP2-CHK", "XPSP3-CHK", "SRV2008SP2"};
+                                         "XPSP2-CHK", "XPSP3-CHK", "SRV2008SP2", "XPSP3CN","WIN7X86"};
 
 //These are user-friendly strings displayed to the user
 const char *WindowsMonitor::s_windowsStrings[] =
 {"Windows XP SP2 RTM",          "Windows XP SP3 RTM",
  "Windows XP SP2 Checked",      "Windows XP SP3 Checked",
- "Windows Server 2008 SP2 RTM"};
+ "Windows Server 2008 SP2 RTM", "Windows XP SP3 Chinese",
+ "Windows 7 X86 Chinese",};
 
-bool WindowsMonitor::s_checkedMap[] = {false, false, true, true};
+bool WindowsMonitor::s_checkedMap[] =  {false, false, true, true, true, false, false};
 
-/*                                             XPSP2         XPSP3        XPSP2-CHK   XPSP3-CHK   SRV2008SP2 */
-unsigned WindowsMonitor::s_pointerSize[] =     {4,4,4,4,4};
-uint64_t WindowsMonitor::s_kernelNativeBase[]= {0x00000000,  0x00400000,  0x00000000, 0x00400000, 0x00400000};
+/*                                              XPSP2         XPSP3        XPSP2-CHK   XPSP3-CHK   SRV2008SP2    XPSP3CN  	WIN7X86*/
+unsigned WindowsMonitor::s_pointerSize[] =      {4,4,4,4,4,4,4};
+uint64_t WindowsMonitor::s_kernelNativeBase[]= {0x00000000,  0x00400000,  0x00000000, 0x00400000, 0x00400000,  0x00400000,  0x00400000};
 //uint64_t WindowsMonitor::s_kernelLoadBase[]=   {0x00000000,  0x804d7000,  0x00000000, 0x80a02000, 0x81836000};
 
-uint64_t WindowsMonitor::s_ntdllNativeBase[]=  {0x7c900000,  0x00000000,  0x7c900000, 0x00000000, 0x77ed0000};
-uint64_t WindowsMonitor::s_ntdllLoadBase[]=    {0x7c900000,  0x00000000,  0x7c900000, 0x00000000, 0x77ed0000};
-uint64_t WindowsMonitor::s_ntdllSize[]=        {0x00000000,  0x00000000,  0x0007a000, 0x00000000, 0x001257F8};
+uint64_t WindowsMonitor::s_ntdllNativeBase[]=  {0x7c900000,  0x00000000,  0x7c900000, 0x00000000, 0x77ed0000,  0x7c920000,  0x7c920000};
+uint64_t WindowsMonitor::s_ntdllLoadBase[]=    {0x7c900000,  0x00000000,  0x7c900000, 0x00000000, 0x77ed0000,  0x7c920000,  0x7c920000};
+uint64_t WindowsMonitor::s_ntdllSize[]=         {0x00000000,  0x00000000,  0x0007a000, 0x00000000, 0x001257F8,  0x00000000,  0x00000000};
 
-uint64_t WindowsMonitor::s_driverLoadPc[] =    {0x00000000, 0x004cc99a, 0x00000000, 0x0053d5d6, 0x00563b82};
-uint64_t WindowsMonitor::s_driverDeletePc[] =  {0x00000000, 0x004EB33F, 0x00000000, 0x00540a72, 0x0054217F};
-uint64_t WindowsMonitor::s_kdDbgDataBlock[] =  {0x00000000, 0x00475DE0, 0x00000000, 0x004ec3f0, 0x004eec98};
+uint64_t WindowsMonitor::s_driverLoadPc[] =     {0x00000000, 0x004cc99a, 0x00000000, 0x0053d5d6, 0x00563b82, 0x004cc99a, 0x004cc99a};
+uint64_t WindowsMonitor::s_driverDeletePc[] =  {0x00000000, 0x004EB33F, 0x00000000, 0x00540a72, 0x0054217F, 0x004EB33F, 0x004EB33F};
+uint64_t WindowsMonitor::s_kdDbgDataBlock[] =   {0x00000000, 0x00475DE0, 0x00000000, 0x004ec3f0, 0x004eec98, 0x0046EBE0, 0x0046EBE0};
 
-uint64_t WindowsMonitor::s_panicPc1[] =        {0x00000000, 0x0045BCAA, 0x00000000, 0x0042f478, 0x004BBE83};
-uint64_t WindowsMonitor::s_panicPc2[] =        {0x00000000, 0x0045C7CD, 0x00000000, 0x0042ff44, 0x004BB857};
-uint64_t WindowsMonitor::s_panicPc3[] =        {0x00000000, 0x0045C7F3, 0x00000000, 0x0042ff62, 0x004BB87B};
+uint64_t WindowsMonitor::s_panicPc1[] =        {0x00000000, 0x0045BCAA, 0x00000000, 0x0042f478, 0x004BBE83, 0x0045BCAA, 0x0045BCAA};
+uint64_t WindowsMonitor::s_panicPc2[] =        {0x00000000, 0x0045C7CD, 0x00000000, 0x0042ff44, 0x004BB857, 0x0045C7CD, 0x0045C7CD};
+uint64_t WindowsMonitor::s_panicPc3[] =        {0x00000000, 0x0045C7F3, 0x00000000, 0x0042ff62, 0x004BB87B, 0x0045C7F3, 0x0045C7F3};
 
-uint64_t WindowsMonitor::s_ntTerminateProc[] = {0x00000000, 0x004ab3c8, 0x00000000, 0x005dab73, 0x0061913f};
+uint64_t WindowsMonitor::s_ntTerminateProc[] = {0x00000000, 0x004ab3c8, 0x00000000, 0x005dab73, 0x0061913f, 0x004AB3C8, 0x004ab3c8};//x004F1687
 
 //Points to the instruction after which the kernel-mode stack in KTHREAD is properly initialized
-uint64_t WindowsMonitor::s_ntKeInitThread[] =  {0x00000000, 0x004b75fc, 0x00000000, 0x00000000, 0x00000000};
+uint64_t WindowsMonitor::s_ntKeInitThread[] =  {0x00000000, 0x004b75fc, 0x00000000, 0x00000000, 0x00000000, 0x004b75fc, 0x004b75fc};
 
 //Points to the start of KeTerminateThread (this function terminates the current thread)
-uint64_t WindowsMonitor::s_ntKeTerminateThread[] = {0x00000000, 0x004214c9, 0x00000000, 0x00000000, 0x00000000};
+uint64_t WindowsMonitor::s_ntKeTerminateThread[] = {0x00000000, 0x004214c9, 0x00000000, 0x00000000, 0x00000000, 0x004214C9, 0x004214c9};
 
-uint64_t WindowsMonitor::s_sysServicePc[] =    {0x00000000, 0x00407631, 0x00000000, 0x004dca05, 0x0045777E};
+uint64_t WindowsMonitor::s_sysServicePc[] =    {0x00000000, 0x00407631, 0x00000000, 0x004dca05, 0x0045777E, 0x00407631, 0x00407631};
 
-uint64_t WindowsMonitor::s_psProcListPtr[] =   {0x00000000, 0x0048A358, 0x00000000, 0x005102b8, 0x00504150};
+uint64_t WindowsMonitor::s_psProcListPtr[] =   {0x00000000, 0x0048A358, 0x00000000, 0x005102b8, 0x00504150, 0x0048A358, 0x0048A358};
 
-uint64_t WindowsMonitor::s_ldrpCall[] =        {0x7C901193, 0x7C901176, 0x00000000, 0x00000000, 0x77F11698};
-uint64_t WindowsMonitor::s_dllUnloadPc[] =     {0x00000000, 0x7c91e12a, 0x00000000, 0x00000000, 0x77F0BB58};
+uint64_t WindowsMonitor::s_ldrpCall[] =        {0x7C901193, 0x7C901176, 0x00000000, 0x00000000, 0x77F11698, 0x7C921176, 0x7C921176};
+uint64_t WindowsMonitor::s_dllUnloadPc[] =     {0x00000000, 0x7c91e12a, 0x00000000, 0x00000000, 0x77F0BB58, 0x7c93e12a, 0x7c93e12a};
 
 //Offset of the thread list head in EPROCESS
-uint64_t WindowsMonitor::s_offEprocAllThreads[] =     {0x0, 0x190, 0x0, 0x0, 0x0};
+uint64_t WindowsMonitor::s_offEprocAllThreads[] =     {0x0, 0x190, 0x0, 0x0, 0x0, 0x190, 0x190};
 //Offset of the thread list link in ETHREAD
-uint64_t WindowsMonitor::s_offEthreadLink[] =         {0x0, 0x22c, 0x0, 0x0, 0x0};
+uint64_t WindowsMonitor::s_offEthreadLink[] =         {0x0, 0x22c, 0x0, 0x0, 0x0, 0x22c, 0x22c};
+
+uint64_t WindowsMonitor::s_KPCR_ADDRESS[] =         {0x0, 0x00, 0x0, 0x0, 0x0, 0x00, 0x00};
 
 
 WindowsMonitor::~WindowsMonitor()
@@ -171,7 +175,7 @@ void WindowsMonitor::initialize()
     }
 
     //XXX: Warn about some unsupported features
-    if (m_Version != XPSP3 && m_monitorThreads) {
+    if ((m_Version != XPSP3&&m_Version!= XPSP3CN && m_Version != WIN7X86) && m_monitorThreads) {
         s2e()->getWarningsStream() << "WindowsMonitor does not support threads for the chosen OS version.\n"
                                    << "Please use monitorThreads=false in the configuration file\n"
                                    << "Plugins that depend on this feature will not work.\n";
@@ -260,7 +264,7 @@ void WindowsMonitor::InitializeAddresses(S2EExecutionState *state)
 
     //Display some info
     s2e()->getMessagesStream() << "Windows " << hexval(m_kdVersion.MinorVersion) <<
-            (m_kdVersion.MajorVersion == 0xF ? " FREE BUILD" : " CHECKED BUILD") << '\n';
+            (m_kdVersion.MajorVersion == 0xF ? " FREE BUILD" : " CHECKED BUILD") << " KernBase : " << hexval(m_kdVersion.KernBase) << '\n';
 
     return;
 
@@ -298,6 +302,7 @@ void WindowsMonitor::slotTranslateInstructionStart(ExecutionSignal *signal,
     if(m_KernelMode) {
         //XXX: a module load can be notified twice if it was being loaded while the snapshot was saved.
         if (m_FirstTime) {
+        	 InitializeAddresses(state);
             slotKmUpdateModuleList(state, pc);
             notifyLoadForAllThreads(state);
         }
@@ -380,7 +385,7 @@ void WindowsMonitor::slotKmThreadInit(S2EExecutionState *state, uint64_t pc)
     s2e()->getDebugStream() << "WindowsMonitor: creating kernel-mode thread\n";
 
     uint32_t pThread;
-    assert(m_Version == XPSP3 && "Unsupported OS version");
+    assert((m_Version == XPSP3 ||m_Version==XPSP3CN ||m_Version == WIN7X86) && "Unsupported OS version");
 
     //XXX: Fix assumption about ESI register
     if (!state->readCpuRegisterConcrete(CPU_OFFSET(regs[R_ESI]), &pThread, sizeof(pThread))) {
@@ -661,10 +666,37 @@ uint64_t WindowsMonitor::getCurrentThread(S2EExecutionState *state)
     //It is located in fs:KPCR_CURRENT_THREAD_OFFSET
     uint64_t base = getTibAddress(state);
     uint32_t pThread = 0;
-    if (!state->readMemoryConcrete(base + FS_CURRENT_THREAD_OFFSET, &pThread, sizeof(pThread))) {
-        s2e()->getWarningsStream() << "Failed to get thread address" << '\n';
-        return 0;
-    }
+    if (m_KernelMode) {
+		if (!state->readMemoryConcrete(base + FS_CURRENT_THREAD_OFFSET,
+				&pThread, sizeof(pThread))) {
+			s2e()->getWarningsStream() << "Failed to get thread address"
+					<< '\n';
+			return 0;
+		}
+	} else {
+		//FIXME: 不用FS_CURRENT_THREAD_OFFSET，直接用0x24
+		if(m_Version == WIN7X86){
+			//KPCR +0x120 --> KPRCB;
+			//KPRCB + 4   --> _KTHREAD
+			//_KTHREAD + 50 --> _KPROCESS
+			if (!state->readMemoryConcrete(s_KPCR_ADDRESS[WIN7X86] + FS_CURRENT_THREAD_OFFSET,
+							&pThread, sizeof(pThread))) {
+						s2e()->getWarningsStream() << "Failed to get thread address at "
+								<< hexval(s_KPCR_ADDRESS[WIN7X86] + FS_CURRENT_THREAD_OFFSET)<< '\n';
+						return 0;
+					}
+		}else{
+			if (!state->readMemoryConcrete(base + 0x24, &pThread,
+					sizeof(pThread))) {
+				if (base >= 0x7ffa7000) {
+					throw CpuExitException(1, base + 0x24);
+				}
+				s2e()->getWarningsStream() << "Failed to get thread address"
+						<< '\n';
+				return 0;
+			}
+		}
+	}
 
     return pThread;
 }
@@ -690,7 +722,8 @@ uint64_t WindowsMonitor::getFirstThread(S2EExecutionState *state, uint64_t eproc
 
 uint64_t WindowsMonitor::getCurrentProcess(S2EExecutionState *state)
 {
-    uint64_t pThread = getCurrentThread(state);
+    uint64_t pThread = 0x0;
+    pThread = getCurrentThread(state);
     if (!pThread) {
         return 0;
     }
@@ -704,7 +737,7 @@ uint64_t WindowsMonitor::getCurrentProcess(S2EExecutionState *state)
 
     uint32_t pProcess = 0;
     if (!state->readMemoryConcrete(pThread + threadOffset, &pProcess, sizeof(pProcess))) {
-        s2e()->getWarningsStream() << "Failed to get process address" << '\n';
+    	s2e()->getWarningsStream() << "Failed to get process address pThread=" << hexval(pThread) << " threadOffset=" <<  hexval(threadOffset)<< '\n';
         return 0;
     }
 
@@ -833,6 +866,13 @@ bool WindowsMonitor::getThreadStack(S2EExecutionState *state,
 
 bool WindowsMonitor::getCurrentStack(S2EExecutionState *state, uint64_t *base, uint64_t *size)
 {
+	if (!isKernelAddress(state->getPc())) {
+		if (H_getCurrentStack(state, base, size)) {
+			return true;
+		}else{
+			return false;
+		}
+	}
     if (getDpcStack(state, base, size)) {
         return true;
     }
@@ -844,7 +884,38 @@ bool WindowsMonitor::getCurrentStack(S2EExecutionState *state, uint64_t *base, u
 
     return getThreadStack(state, pThread, base, size);
 }
+//===============================================================================
+bool WindowsMonitor::H_getCurrentStack(S2EExecutionState *state, uint64_t *base, uint64_t *size)
+{
+    // uint64_t pThread = getCurrentThread(state);
+    uint64_t tib = getTibAddress(state);
 
+    if (!tib)
+    {
+        return false;
+    }
+
+    // stack-limit
+    state->readMemoryConcrete( (tib + 8),
+			       base,
+			       sizeof(uint32_t)
+			     );
+    // stack-base
+    state->readMemoryConcrete( (tib + 4),
+			       size,
+			       sizeof(uint32_t)
+			     );
+
+    if( (*size == 0) || (*base == 0) )
+    {
+	return false;
+    }// end of if(size)
+
+    *size = *size - *base;
+
+    return true;
+}// H_getCurrentStack( )
+//===============================================================================
 //XXX: Does not work for user-mode for now.
 bool WindowsMonitor::getThreadDescriptor(S2EExecutionState *state,
                                          uint64_t pThread,

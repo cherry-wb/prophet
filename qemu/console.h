@@ -57,6 +57,7 @@ void qemu_remove_led_event_handler(QEMUPutLEDEntry *entry);
 void kbd_put_keycode(int keycode);
 
 void s2e_grab_end(void);
+int get_keycode_nonstatic(const char *key);
 
 void kbd_put_ledstate(int ledstate);
 void kbd_mouse_event(int dx, int dy, int dz, int buttons_state);

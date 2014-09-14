@@ -56,7 +56,10 @@ WindowsUmInterceptor::WindowsUmInterceptor(WindowsMonitor *Os)
     m_Os = Os;
     m_TracingState = SEARCH_PROCESS;
     m_PrevCr3 = 0;
-
+	if (Os) {
+		m_detector = static_cast<ModuleExecutionDetector*>(Os->s2e()->getPlugin(
+				"ModuleExecutionDetector"));
+	}
     m_ASBase = 0;
     m_ASSize = Os->GetUserAddressSpaceSize();
 }
@@ -103,6 +106,14 @@ bool WindowsUmInterceptor::NotifyLoadedProcesses(S2EExecutionState *state)
 
 bool WindowsUmInterceptor::FindModules(S2EExecutionState *state)
 {
+	if(m_detector){
+	}else{
+		if (m_Os) {
+			m_detector =
+					static_cast<ModuleExecutionDetector*>(m_Os->s2e()->getPlugin(
+							"ModuleExecutionDetector"));
+		}
+	}
     s2e::windows::LDR_DATA_TABLE_ENTRY32 LdrEntry;
     s2e::windows::PEB_LDR_DATA32 LdrData;
 
@@ -133,7 +144,7 @@ bool WindowsUmInterceptor::FindModules(S2EExecutionState *state)
         std::transform(s.begin(), s.end(), s.begin(), ::tolower);
 
         if (s.length() == 0) {
-            if (LdrEntry.DllBase == 0x7c900000) {
+        	   if (LdrEntry.DllBase ==WindowsMonitor::s_ntdllNativeBase[m_Os->GetVersion()]) {
                 //XXX
                 s = "ntdll.dll";
             }else {
@@ -152,8 +163,8 @@ bool WindowsUmInterceptor::FindModules(S2EExecutionState *state)
         //XXX: this must be state-local
         if (m_LoadedLibraries.find(Desc) == m_LoadedLibraries.end()) {
             s2e_debug_print("  MODULE %s Base=%#x Size=%#x\n", s.c_str(), LdrEntry.DllBase, LdrEntry.SizeOfImage);
-            m_LoadedLibraries.insert(Desc);
             NotifyModuleLoad(state, Desc);
+            m_LoadedLibraries.insert(Desc);
         }
 
         CurLib = CONTAINING_RECORD32(LdrEntry.InLoadOrderLinks.Flink,
@@ -190,7 +201,7 @@ bool WindowsUmInterceptor::WaitForProcessInit(S2EExecutionState* state)
         if (!curProcess) {
             return false;
         }
-
+        g_s2e->getDebugStream() << "curProcess ="<< hexval(curProcess) <<"\n";
         Peb = m_Os->getPeb(state, curProcess);
     }
 
@@ -234,6 +245,14 @@ bool WindowsUmInterceptor::WaitForProcessInit(S2EExecutionState* state)
 
 void WindowsUmInterceptor::NotifyModuleLoad(S2EExecutionState *state, ModuleDescriptor &Library)
 {
+	if(m_detector){
+	}else{
+		if (m_Os) {
+			m_detector =
+					static_cast<ModuleExecutionDetector*>(m_Os->s2e()->getPlugin(
+							"ModuleExecutionDetector"));
+		}
+	}
     WindowsImage Image(state, Library.LoadBase);
     Library.NativeBase = Image.GetImageBase();
     Library.EntryPoint = Image.GetEntryPoint() + Library.NativeBase;
@@ -250,12 +269,14 @@ bool WindowsUmInterceptor::CatchProcessTerminationXp(S2EExecutionState *State)
 {
     uint64_t pEProcess;
 
-    assert(m_Os->GetVersion() == WindowsMonitor::XPSP3);
+    assert((m_Os->GetVersion() == WindowsMonitor::XPSP3) ||(m_Os->GetVersion() == WindowsMonitor::XPSP3CN) );
 
     pEProcess = cast<klee::ConstantExpr>(
         State->readCpuRegister(CPU_OFFSET(regs[R_EBX]), 8*sizeof(target_ulong)))
             ->getZExtValue();
     s2e::windows::EPROCESS32_XP EProcess;
+
+    memset(EProcess.ImageFileName,0,16);
 
     if (!State->readMemoryConcrete(pEProcess, &EProcess, sizeof(EProcess))) {
         TRACE("Could not read EProcess data structure at %#"PRIx64"!\n", pEProcess);
@@ -315,7 +336,9 @@ bool WindowsUmInterceptor::CatchProcessTerminationServer2008(S2EExecutionState *
 bool WindowsUmInterceptor::CatchProcessTermination(S2EExecutionState *State)
 {
     switch(m_Os->GetVersion()) {
-        case WindowsMonitor::XPSP3: return CatchProcessTerminationXp(State);
+        case WindowsMonitor::XPSP3:
+        case WindowsMonitor::XPSP3CN:
+        	return CatchProcessTerminationXp(State);
         case WindowsMonitor::SRV2008SP2: return CatchProcessTerminationServer2008(State);
         default: assert(false && "Unsupported OS");
     }
@@ -353,7 +376,7 @@ bool WindowsUmInterceptor::CatchModuleUnloadBase(S2EExecutionState *State, uint6
 
 bool WindowsUmInterceptor::CatchModuleUnloadXPSP3(S2EExecutionState *State)
 {
-    assert(m_Os->GetVersion() == WindowsMonitor::XPSP3);
+	  assert((m_Os->GetVersion() == WindowsMonitor::XPSP3) ||(m_Os->GetVersion() == WindowsMonitor::XPSP3CN) );
     uint64_t pLdrEntry = cast<klee::ConstantExpr>(
         State->readCpuRegister(CPU_OFFSET(regs[R_ESI]), 8*sizeof(target_ulong)))
             ->getZExtValue();
@@ -386,7 +409,9 @@ bool WindowsUmInterceptor::CatchModuleUnloadServer2008(S2EExecutionState *state)
 bool WindowsUmInterceptor::CatchModuleUnload(S2EExecutionState *State)
 {
     switch(m_Os->GetVersion()) {
-        case WindowsMonitor::XPSP3: return CatchModuleUnloadXPSP3(State);
+        case WindowsMonitor::XPSP3:
+        case WindowsMonitor::XPSP3CN:
+        	return CatchModuleUnloadXPSP3(State);
         case WindowsMonitor::SRV2008SP2: return CatchModuleUnloadServer2008(State);
         default: assert(false && "Unsupported OS");
     }
@@ -404,11 +429,13 @@ bool WindowsUmInterceptor::GetPids(S2EExecutionState *State, PidSet &out)
 
     //Read the head of the list
     if (!State->readMemoryConcrete(ActiveProcessList, &ListHead, sizeof(ListHead))) {
+    	g_s2e->getDebugStream() << "fail to get ActiveProcessList at " << hexval(ActiveProcessList) << '\n';
         return false;
     }
 
     //Check for empty list
     if (ListHead.Flink == ActiveProcessList) {
+    	g_s2e->getDebugStream() << "empty ActiveProcessList at " << hexval(ActiveProcessList) << '\n';
         return true;
     }
 
@@ -420,8 +447,8 @@ bool WindowsUmInterceptor::GetPids(S2EExecutionState *State, PidSet &out)
         uint32_t pProcessEntry = m_Os->getProcessFromLink(pItem);
         uint32_t pDirectoryTableBase = m_Os->getDirectoryTableBase(State, pProcessEntry);
 
-//        g_s2e->getDebugStream() << "Found EPROCESS=0x" <<  pProcessEntry << " PgDir=0x" << std::hex << ProcessEntry.Pcb.DirectoryTableBase <<
-//                ProcessEntry.ImageFileName << std::endl;
+        g_s2e->getDebugStream() << "Found EPROCESS=0x" <<  hexval(pProcessEntry) << " PgDir=0x" << hexval(pDirectoryTableBase) << "\n";
+
 
         out.insert(pDirectoryTableBase);
     }

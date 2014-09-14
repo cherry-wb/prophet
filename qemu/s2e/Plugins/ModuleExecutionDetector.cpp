@@ -72,7 +72,7 @@ extern CPUArchState *env;
 #include "ModuleExecutionDetector.h"
 #include <assert.h>
 #include <sstream>
-
+#include <llvm/Support/TimeValue.h>
 using namespace s2e;
 using namespace s2e::plugins;
 
@@ -119,6 +119,14 @@ void ModuleExecutionDetector::initializeConfiguration()
 {
     ConfigFile *cfg = s2e()->getConfig();
 
+    m_mainmodule = cfg->getString(getConfigKey() + ".mainmodule");
+	m_mainmoduleIndentity = 0;
+	if (m_mainmodule.length() == 0) {
+		s2e()->getWarningsStream()
+				<< "ModuleExecutionDetector: You must specify mainmodule to track" << '\n';
+		exit(-1);
+		return;
+	}
     ConfigFile::string_list keyList = cfg->getListKeys(getConfigKey());
 
     if (keyList.size() == 0) {
@@ -129,7 +137,7 @@ void ModuleExecutionDetector::initializeConfiguration()
     m_ConfigureAllModules = cfg->getBool(getConfigKey() + ".configureAllModules");
 
     foreach2(it, keyList.begin(), keyList.end()) {
-        if (*it == "trackAllModules"  || *it == "configureAllModules") {
+        if (*it == "trackAllModules"  || *it == "configureAllModules" || *it == "mainmodule") {
             continue;
         }
 
@@ -144,6 +152,7 @@ void ModuleExecutionDetector::initializeConfiguration()
             s2e()->getWarningsStream() << "You must specifiy " << s.str() + "moduleName" << '\n';
             exit(-1);
         }
+        std::transform(d.moduleName.begin(), d.moduleName.end(), d.moduleName.begin(), ::tolower);
 
         d.kernelMode = cfg->getBool(s.str() + "kernelMode", false, &ok);
         if (!ok) {
@@ -151,6 +160,50 @@ void ModuleExecutionDetector::initializeConfiguration()
             exit(-1);
         }
 
+        ConfigFile::string_list pollingEntries = cfg->getListKeys(
+    				s.str() + "ranges");
+
+		if (pollingEntries.size() == 0) {
+			Range rg;
+			rg.start = 0x00000000;
+			rg.end = 0xFFFFFFFF;
+			d.ranges.insert(rg);
+		}else{
+			foreach2(it, pollingEntries.begin(), pollingEntries.end())
+			{
+				std::stringstream ss1;
+				ss1 << s.str() << "ranges" << "." << *it;
+				ConfigFile::integer_list il = cfg->getIntegerList(ss1.str());
+				if (il.size() != 2) {
+					s2e()->getWarningsStream() << "Range entry " << ss1.str()
+							<< " must be of the form {startPc, endPc} format"
+							<< '\n';
+					continue;
+				}
+
+				bool ok = false;
+				uint64_t start = cfg->getInt(ss1.str() + "[1]", 0, &ok);
+				if (!ok) {
+					s2e()->getWarningsStream()
+							<< "ModuleExecutionDetector could not read "
+							<< ss1.str() << "[0]" << '\n';
+					continue;
+				}
+
+				uint64_t end = cfg->getInt(ss1.str() + "[2]", 0, &ok);
+				if (!ok) {
+					s2e()->getWarningsStream()
+							<< "ModuleExecutionDetector could not read "
+							<< ss1.str() << "[1]" << '\n';
+					continue;
+				}
+				//Convert the format to native address
+				Range rg;
+				rg.start = start;
+				rg.end = end;
+				d.ranges.insert(rg);
+			}
+		}
 
         s2e()->getDebugStream() << "ModuleExecutionDetector: " <<
                 "id=" << d.id << " " <<
@@ -280,9 +333,32 @@ void ModuleExecutionDetector::moduleLoadListener(
 
     //If module name matches the configured ones, activate.
     s2e()->getDebugStream() << "ModuleExecutionDetector: " <<
-            "Module "  << module.Name << " loaded - " <<
+            "Module "  << module.Name <<" PID "  << hexval(module.Pid) << " loaded - " <<
             "Base=" <<  hexval(module.LoadBase) << " Size=" << hexval(module.Size);
 
+    const std::string *s = getModuleId(module);
+	if (!isKernelMode()) {
+		if (s  && m_mainmodule == *s && m_mainmoduleIndentity == 0) {//  //允许多进程，以最后一个进程为主进程 ,通过跳过参数m_skipprocessnum进行设置
+			m_mainmoduleIndentity = module.Pid;
+			std::stringstream ss;
+			ss << "ModuleExecutionDetector mainmodule：" << m_mainmodule << "PID:"
+					<< hexval(m_mainmoduleIndentity);
+			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"onmainmoduleload",ss.str());
+
+		} else if (s && m_mainmoduleIndentity == 0 && m_mainmodule != *s) {
+			return; //主模块加载之前不要加载任何其他附加模块
+		} else if (m_mainmoduleIndentity != 0 && module.Pid != m_mainmoduleIndentity) {
+			return; //不是作为主进程附加模块而加载的，则略过
+		}
+	}else{
+		if (s && m_mainmoduleIndentity == 0 && m_mainmodule == *s) {
+			m_mainmoduleIndentity = module.LoadBase;
+			std::stringstream ss;
+			ss << "ModuleExecutionDetector mainmodule:" << m_mainmodule << "LoadBase:"
+					<< hexval(m_mainmoduleIndentity);
+			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"onmainmoduleload",ss.str());
+		}
+	}
 
     ModuleExecutionCfg cfg;
     cfg.moduleName = module.Name;
@@ -292,8 +368,8 @@ void ModuleExecutionDetector::moduleLoadListener(
             s2e()->getDebugStream() << " [ALREADY REGISTERED]" << '\n';
         }else {
             s2e()->getDebugStream() << " [REGISTERING]" << '\n';
-            plgState->loadDescriptor(module, true);
             onModuleLoad.emit(state, module);
+            plgState->loadDescriptor(module, true);
         }
         return;
     }
@@ -304,8 +380,8 @@ void ModuleExecutionDetector::moduleLoadListener(
             s2e()->getDebugStream() << " [ALREADY REGISTERED ID=" << (*it).id << "]" << '\n';
         }else {
             s2e()->getDebugStream() << " [REGISTERING ID=" << (*it).id << "]" << '\n';
-            plgState->loadDescriptor(module, true);
             onModuleLoad.emit(state, module);
+            plgState->loadDescriptor(module, true);
         }
         return;
     }
@@ -315,8 +391,8 @@ void ModuleExecutionDetector::moduleLoadListener(
     if (m_TrackAllModules) {
         if (!plgState->exists(&module, false)) {
             s2e()->getDebugStream() << " [REGISTERING NOT TRACKED]" << '\n';
-            plgState->loadDescriptor(module, false);
             onModuleLoad.emit(state, module);
+            plgState->loadDescriptor(module, false);
         }
         return;
     }
@@ -353,6 +429,14 @@ bool ModuleExecutionDetector::isModuleConfigured(const std::string &moduleId) co
 
     return m_ConfiguredModulesId.find(cfg) != m_ConfiguredModulesId.end();
 }
+bool ModuleExecutionDetector::printModuleConfigured() const
+{
+	foreach2(it, m_ConfiguredModulesId.begin(), m_ConfiguredModulesId.end())
+	{
+    	 std::cout << "name:"<< (*it).moduleName << " id:" << (*it).id << "\n";
+    }
+    return true;
+}
 
 /*****************************************************************************/
 /*****************************************************************************/
@@ -380,6 +464,46 @@ const std::string *ModuleExecutionDetector::getModuleId(const ModuleDescriptor &
     return &(*it).id;
 }
 
+bool ModuleExecutionDetector::goahead(const ModuleDescriptor* currentModule,
+		uint64_t pc) {
+	if (currentModule) {
+		ModuleExecutionCfg cfg;
+		cfg.moduleName = currentModule->Name;
+		ConfiguredModulesByName::iterator it = m_ConfiguredModulesName.find(
+				cfg);
+		bool found = (it != m_ConfiguredModulesName.end());
+		bool rfound = false;
+		if (found) {
+			foreach2(rgit, (*it).ranges.begin(), (*it).ranges.end())
+			{
+				if ((pc >= (*rgit).start) && (pc <= (*rgit).end)) {
+					rfound = true;
+					break;
+				}
+			}
+		}
+		bool res = found && rfound;
+		return res;
+	} else {
+		return false;
+	}
+}
+bool ModuleExecutionDetector::goahead(S2EExecutionState *state,uint64_t pc,bool isDataMemoryAccess) {
+    DECLARE_PLUGINSTATE(ModuleTransitionState, state);
+    uint64_t pid = m_Monitor->getPid(state, pc);
+    const ModuleDescriptor *currentModule =
+            plgState->getDescriptor(pid, pc);
+    bool shouldgo = goahead(currentModule, pc);
+
+    return shouldgo;
+}
+void ModuleExecutionDetector::connectExecution(
+		const ModuleDescriptor* currentModule, uint64_t pc,
+		ExecutionSignal* signal) {
+	signal->connect(sigc::mem_fun(*this, &ModuleExecutionDetector::onExecution));
+}
+
+
 void ModuleExecutionDetector::onTranslateBlockStart(
     ExecutionSignal *signal,
     S2EExecutionState *state,
@@ -395,9 +519,13 @@ void ModuleExecutionDetector::onTranslateBlockStart(
 
     if (currentModule) {
         //S2E::printf(s2e()->getDebugStream(), "Translating block %#"PRIx64" belonging to %s\n",pc, currentModule->Name.c_str());
-        signal->connect(sigc::mem_fun(*this,
-            &ModuleExecutionDetector::onExecution));
-
+        connectExecution(currentModule, pc, signal);
+        if (pc >= s2e()->getTranslateWatchStart()
+        				&& pc <= s2e()->getTranslateWatchEnd()) {
+			std::stringstream ss;
+			ss << "start to translate basicblock. start：" << hexval(tb->pc) << "  size："<<hexval(tb->size) <<"\n";
+			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"translateblockstart",ss.str());
+		}
         onModuleTranslateBlockStart.emit(signal, state, *currentModule, tb, pc);
     }
 }
@@ -431,17 +559,14 @@ void ModuleExecutionDetector::onTranslateBlockEnd(
             //Only instrument in case there is a module change
             //TRACE("Static transition from %#"PRIx64" to %#"PRIx64"\n",
             //    endPc, targetPc);
-            signal->connect(sigc::mem_fun(*this,
-                &ModuleExecutionDetector::onExecution));
+        	connectExecution(currentModule, targetPc, signal);
         }
     }else {
         //TRACE("Dynamic transition from %#"PRIx64" to %#"PRIx64"\n",
         //        endPc, targetPc);
         //In case of dynamic targets, conservatively
         //instrument code.
-        signal->connect(sigc::mem_fun(*this,
-                &ModuleExecutionDetector::onExecution));
-
+    	connectExecution(currentModule, targetPc, signal);
     }
 
     if (currentModule) {

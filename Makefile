@@ -16,11 +16,18 @@
 #  Contains llvm-native, llvm-debug, llvm-release, and llvm source folders
 #  Can be used to avoid rebuilding clang/llvm for every branch of S2E
 #
-
+#  USE_METASMT=yes
+#      Turn off build parallelization.
 S2ESRC := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 S2EBUILD:=$(CURDIR)
 LLVMBUILD?=$(S2EBUILD)
 METASMT_ROOT?=/home/wb/work/workspace/metaSMT/build/root
+
+ifeq ($(USE_METASMT),yes)
+METASMT_CONFIG=--with-metasmt=$(METASMT_ROOT)
+else 
+METASMT_CONFIG=
+endif
 
 OS := $(shell uname)
 JOBS:=2
@@ -214,7 +221,7 @@ KLEE_CONFIGURE_COMMON = $(S2ESRC)/klee/configure \
                         --target=x86_64 --enable-exceptions \
                         CC=$(CLANG_CC) CXX=$(CLANG_CXX)
 
-KLEE_CONFIGURE_COMMAND = $(KLEE_CONFIGURE_COMMON) --with-stp=$(S2EBUILD)/stp  --with-metasmt=$(METASMT_ROOT)
+KLEE_CONFIGURE_COMMAND = $(KLEE_CONFIGURE_COMMON) --with-stp=$(S2EBUILD)/stp  $(METASMT_CONFIG)
 
 stamps/klee-debug-configure: stamps/stp-make stamps/llvm-debug-make
 stamps/klee-debug-configure: CONFIGURE_COMMAND = $(KLEE_CONFIGURE_COMMAND) \
@@ -284,7 +291,7 @@ QEMU_COMMON_FLAGS = --prefix=$(S2EBUILD)/opt\
 
 QEMU_CONFIGURE_FLAGS = --with-stp=$(S2EBUILD)/stp \
                        $(QEMU_COMMON_FLAGS) \
-                        --with-metasmt=$(METASMT_ROOT)
+                        $(METASMT_CONFIG)
 
 QEMU_DEBUG_FLAGS = --with-llvm=$(LLVMBUILD)/llvm-debug/Debug+Asserts \
                    --enable-debug

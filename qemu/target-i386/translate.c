@@ -342,7 +342,11 @@ static inline void gen_instr_end(DisasContext *s)
         s->done_instr_end = 1;
     }
 }
-
+static inline void gen_instr_end_force(DisasContext *s)
+{
+        s2e_on_translate_instruction_end(g_s2e, g_s2e_state, s->tb, s->insPc, s->useNextPc ? s->nextPc : (uint64_t)-1);
+        s->done_instr_end = 1;
+}
 #endif
 
 static inline void gen_op_mov_reg_v(int ot, int reg, TCGv t0)
@@ -465,7 +469,7 @@ static inline void gen_op_jmp_T0(DisasContext *s)
     tcg_gen_st_tl(cpu_T[0], cpu_env, offsetof(CPUX86State, eip));
     #ifdef CONFIG_S2E
     s2e_translate_compute_reg_mask_end(s);
-    gen_instr_end(s);//cherry
+    gen_instr_end_force(s);//cherry
     s2e_on_translate_block_end(g_s2e, g_s2e_state,
                                s->tb, s->insPc, 0, 0);
     #endif
@@ -675,7 +679,7 @@ static inline void gen_jmp_im(DisasContext *s, target_ulong pc)
     /* gen_eob may come after gototb, so we need to instrument here ! */
     if (s->enable_jmp_im) {
         s2e_translate_compute_reg_mask_end(s);
-        gen_instr_end(s);//cherry
+        gen_instr_end_force(s);//cherry
         s2e_on_translate_block_end(g_s2e, g_s2e_state,
                                    s->tb, s->insPc, 1, pc);
     }

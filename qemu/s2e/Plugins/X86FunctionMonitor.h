@@ -40,7 +40,7 @@
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/S2EExecutionState.h>
 #include <s2e/Plugins/OSMonitor.h>
-
+#include <s2e/Plugins/ModuleExecutionDetector.h>
 #include <tr1/unordered_map>
 
 namespace s2e {
@@ -56,12 +56,14 @@ public:
 
     typedef sigc::signal<void, S2EExecutionState*> ReturnSignal;
     typedef sigc::signal<void, S2EExecutionState*, X86FunctionMonitorState*> CallSignal;
-
+    typedef std::set<CallSignal*> CallSignals;
     void initialize();
 
     CallSignal* getCallSignal(
             S2EExecutionState *state,
             uint64_t eip, uint64_t cr3 = 0);
+
+    CallSignals getAllCallSignal( S2EExecutionState *state, uint64_t cr3 = 0); //cherry
 
     void registerReturnSignal(S2EExecutionState *state, X86FunctionMonitor::ReturnSignal &sig);
 
@@ -85,7 +87,9 @@ protected:
 
 protected:
     OSMonitor *m_monitor;
-
+    ModuleExecutionDetector *m_detector;
+    RangeEntries m_forcecheckranges;//cherry
+    RangeEntries m_skipcheckranges;//cherry
     friend class X86FunctionMonitorState;
 
 };
@@ -117,6 +121,8 @@ class X86FunctionMonitorState : public PluginState
     /* Get a signal that is emitted on function calls. Passing eip = 0 means
        any function, and cr3 = 0 means any cr3 */
     X86FunctionMonitor::CallSignal* getCallSignal(uint64_t eip, uint64_t cr3 = 0);
+
+    X86FunctionMonitor::CallSignals getAllCallSignal(uint64_t cr3);//cherry
 
     void slotCall(S2EExecutionState *state, uint64_t pc);
     void slotRet(S2EExecutionState *state, uint64_t pc, bool emitSignal);

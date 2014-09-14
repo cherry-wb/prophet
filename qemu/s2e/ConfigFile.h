@@ -48,6 +48,8 @@ extern "C" {
 
 namespace s2e {
 class S2EExecutionState;
+class StackMonitor;
+class HeapMonitor;
 
 #define LUAS2E "LuaS2E"
 
@@ -271,6 +273,7 @@ class S2ELUAExecutionState
 {
 private:
     S2EExecutionState *m_state;
+    int m_id;
     uint64_t readParameterCdecl(lua_State *L, uint32_t param);
     bool writeParameterCdecl(lua_State *L, uint32_t param, uint64_t val);
     uint64_t readParameterAAPCS(lua_State *L, uint32_t param);
@@ -287,12 +290,35 @@ public:
   int writeRegisterSymb(lua_State *L);
   int readRegister(lua_State *L);
   int readParameter(lua_State *L);
+  int readParameterSymb(lua_State *L);
   int writeParameter(lua_State *L);
   int writeMemorySymb(lua_State *L);
+  int readMemorySymb(lua_State *L);
   int readMemory(lua_State *L);
   int writeMemory(lua_State *L);
   int isSpeculative(lua_State *L);
   int getID(lua_State *L);
+
+  int searchMemory(lua_State *L);
+	int dumpInfo(lua_State *L);
+	int searchFirstSymMemory(lua_State *L);
+
+	int setExecuteStartAndEnd(lua_State *L);
+	int setTranslateStartAndEnd(lua_State *L);
+	int getExecuteStartAndEnd(lua_State *L);
+	int getTranslateStartAndEnd(lua_State *L);
+
+	int isForkingEnabled(lua_State *L);
+	int isRunningConcrete(lua_State *L);
+	int isSymbolicExecutionEnabled(lua_State *L);
+	int getPc(lua_State *L);
+	int getPid(lua_State *L);
+	int getSp(lua_State *L);
+	int getDisasm(lua_State *L);
+	int getFileName(lua_State *L);
+
+	int setMainProcess(lua_State *L);
+
 };
 
 

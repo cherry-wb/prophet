@@ -93,7 +93,14 @@ const NtoskrnlHandlers::AnnotationsArray NtoskrnlHandlers::s_handlers[] = {
 
     DECLARE_EP_STRUC(NtoskrnlHandlers, DebugPrint),
 
-    DECLARE_EP_STRUC(NtoskrnlHandlers, MmGetSystemRoutineAddress)
+    DECLARE_EP_STRUC(NtoskrnlHandlers, MmGetSystemRoutineAddress),
+
+    DECLARE_EP_STRUC(NtoskrnlHandlers, RtlCreateHeap),
+  	DECLARE_EP_STRUC(NtoskrnlHandlers, RtlAllocateHeap),
+  	DECLARE_EP_STRUC(NtoskrnlHandlers, RtlFreeHeap),
+  	DECLARE_EP_STRUC(NtoskrnlHandlers, RtlDestroyHeap),
+
+  	DECLARE_EP_STRUC(NtoskrnlHandlers, IoGetCurrentProcess),
 };
 
 const char * NtoskrnlHandlers::s_ignoredFunctionsList[] = {
@@ -112,6 +119,110 @@ const char * NtoskrnlHandlers::s_ignoredFunctionsList[] = {
     "memcpy", "memset", "wcschr", "_alldiv", "_alldvrm", "_aulldiv", "_aulldvrm",
     "_snwprintf", "_wcsnicmp",
 
+    "CcCanIWrite",
+        "CcCopyRead",
+        "CcCopyWrite",
+        "CcDeferWrite",
+        "CcFlushCache",
+        "CcGetFileObjectFromSectionPtrs",
+        "CcInitializeCacheMap",
+        "CcMdlRead",
+        "CcMdlWriteComplete",
+        "CcPrepareMdlWrite",
+        "CcPurgeCacheSection",
+        "CcSetFileSizes",
+        "CcSetReadAheadGranularity",
+        "CcUninitializeCacheMap",
+        "CcWaitForCurrentLazyWriterActivity",
+        "CcZeroData",
+        "DbgPrint",
+        "ExAcquireResourceExclusiveLite",
+        "ExAcquireResourceSharedLite",
+        "ExAcquireSharedStarveExclusive",
+        "ExAllocateFromPagedLookasideList",
+        "ExAllocatePool",
+        "ExDeleteResourceLite",
+        "ExInitializeNPagedLookasideList",
+        "ExInitializePagedLookasideList",
+        "ExInitializeResourceLite",
+        "ExInterlockedPopEntrySList",
+        "ExInterlockedPushEntrySList",
+        "ExQueueWorkItem",
+        "ExRaiseStatus",
+        "ExReleaseResourceLite",
+        "FsRtlCheckLockForReadAccess",
+        "FsRtlCheckLockForWriteAccess",
+        "FsRtlCheckOplock",
+        "FsRtlFastUnlockAll",
+        "FsRtlGetNextFileLock",
+        "FsRtlInitializeFileLock",
+        "FsRtlInitializeOplock",
+        "FsRtlIsNameInExpression",
+        "FsRtlNormalizeNtstatus",
+        "FsRtlNotifyCleanup",
+        "FsRtlNotifyInitializeSync",
+        "FsRtlOplockIsFastIoPossible",
+        "FsRtlProcessFileLock",
+        "FsRtlTeardownPerStreamContexts",
+        "FsRtlUninitializeFileLock",
+        "FsRtlUninitializeOplock",
+        "IoAllocateIrp",
+        "IoAllocateMdl",
+        "IoCheckShareAccess",
+        "IoCreateStreamFileObjectLite",
+        "IoFreeIrp",
+        "IoGetFileObjectGenericMapping",
+        "IoGetRequestorProcess",
+        "IoGetTopLevelIrp",
+        "IoIsOperationSynchronous",
+        "IoRegisterFsRegistrationChange",
+        "IoRemoveShareAccess",
+        "IoSetShareAccess",
+        "IoSetTopLevelIrp",
+        "IoUpdateShareAccess",
+        "IofCallDriver",
+        "KeDelayExecutionThread",
+        "KeGetCurrentThread",
+        "KeInitializeEvent",
+        "KeSetEvent",
+        "KeWaitForSingleObject",
+        "MmBuildMdlForNonPagedPool",
+        "MmCanFileBeTruncated",
+        "MmForceSectionClosed",
+        "MmMapLockedPages",
+        "MmMapLockedPagesSpecifyCache",
+        "MmProbeAndLockPages",
+        "MmUnlockPages",
+        "MmUnmapLockedPages",
+        "ObQueryNameString",
+        "ObfDereferenceObject",
+        "ObfReferenceObject",
+        "PsGetCurrentProcessId",
+        "PsSetLoadImageNotifyRoutine",
+        "RtlCompareString",
+        "RtlCompareUnicodeString",
+        "RtlCopyUnicodeString",
+        "RtlFreeAnsiString",
+        "RtlGetVersion",
+        "RtlInitAnsiString",
+        "RtlUnicodeStringToAnsiString",
+        "RtlUnwind",
+        "RtlUpcaseUnicodeString",
+        "SeCreateAccessState",
+        "ZwClose",
+        "ZwConnectPort",
+        "ZwCreateSection",
+        "ZwOpenKey",
+        "ZwOpenSymbolicLinkObject",
+        "ZwQuerySymbolicLinkObject",
+        "ZwQueryValueKey",
+        "ZwRequestWaitReplyPort",
+        "_allmul",
+        "_allrem",
+        "_wcsicmp",
+        "strncmp",
+        "towupper",
+        "wcsstr",
     NULL
 };
 
@@ -144,6 +255,11 @@ const SymbolDescriptors NtoskrnlHandlers::s_exportedVariables =
 void NtoskrnlHandlers::initialize()
 {
     WindowsApi::initialize();
+    m_heapMonitor = static_cast<HeapMonitor*>(s2e()->getPlugin("HeapMonitor"));
+	ConfigFile *cfg = s2e()->getConfig();
+	m_showDebugInfo =  cfg->getBool(getConfigKey() + ".showDebugInfo");
+	m_processIoGetCurrentProcess=  cfg->getBool(getConfigKey() + ".processIoGetCurrentProcess");
+	m_posoffset=  cfg->getInt(getConfigKey() + ".posoffset");
 
     m_loaded = false;
 
@@ -1044,5 +1160,347 @@ void NtoskrnlHandlers::revokeAccessToIrp(S2EExecutionState *state, uint32_t pIrp
 }
 
 
+/*
+ HANDLE RtlCreateHeap(
+ DWORD flOptions,
+ SIZE_T dwInitialSize,
+ SIZE_T dwMaximumSize
+ );
+ 驱动层函数签名
+PVOID RtlCreateHeap(
+  _In_      ULONG Flags,
+  _In_opt_  PVOID HeapBase,
+  _In_opt_  SIZE_T ReserveSize,
+  _In_opt_  SIZE_T CommitSize,
+  _In_opt_  PVOID Lock,
+  _In_opt_  PRTL_HEAP_PARAMETERS Parameters
+);
+ */
+void NtoskrnlHandlers::RtlCreateHeap(S2EExecutionState* state,
+		FunctionMonitorState *fns) {
+	//if (!calledFromModule(state)) {
+	//	return;
+	//}
+
+	//Invoke this function in all contexts
+	uint32_t flOptions, ReserveSize, CommitSize;
+	bool ok = true;
+	ok &= readConcreteParameter(state, 0, &flOptions); //flOptions
+	ok &= readConcreteParameter(state, 2, &ReserveSize); //ReserveSize
+	ok &= readConcreteParameter(state, 3, &CommitSize); //CommitSize
+	if (!ok) {
+		if(m_showDebugInfo)
+		s2e()->getDebugStream() << "Could not read parameters in RtlCreateHeap"
+				<< '\n';
+		return;
+	}
+
+	//TODO 读取参数值，维护堆结构
+	if(m_showDebugInfo)
+	s2e()->getMessagesStream(state) << "RtlCreateHeap: "
+			<< "RtlCreateHeap__ReserveSize:" << hexval(ReserveSize)
+			<< " CommitSize:" << hexval(CommitSize) << '\n';
+	FUNCMON_REGISTER_RETURN_A(state, fns, NtoskrnlHandlers::RtlCreateHeapRet,
+			flOptions, ReserveSize, CommitSize);
+}
+
+void NtoskrnlHandlers::RtlCreateHeapRet(S2EExecutionState* state,
+		uint32_t flOptions, uint32_t ReserveSize, uint32_t CommitSize) {
+	if(m_showDebugInfo) HANDLER_TRACE_RETURN();
+	uint32_t hreturn;
+	if (!readCpuRegisterEAXConcrete(state, &hreturn)) { //如果读不到具体内存，再读符号内存
+		klee::ref<klee::Expr> eax = readCpuRegisterEAX(state);
+		if(m_showDebugInfo)
+		s2e()->getMessagesStream(state) << "RtlCreateHeap return symbolic: " << eax
+				<< '\n';
+	} else {
+		if(m_showDebugInfo)
+		s2e()->getMessagesStream(state) << "RtlCreateHeap return concrete: "
+				<< hexval(hreturn) << '\n';
+	}
+	if(m_heapMonitor) m_heapMonitor->HeapCreate(state, hreturn, flOptions, ReserveSize,
+			CommitSize);
+}
+
+/*
+ BOOL RtlDestroyHeap(
+ HANDLE hHeap
+ );
+
+ */
+void NtoskrnlHandlers::RtlDestroyHeap(S2EExecutionState* state,
+		FunctionMonitorState *fns) {
+	//if (!calledFromModule(state)) {
+	//	return;
+	//}
+
+	//Invoke this function in all contexts
+	uint32_t hHeap;
+	bool ok = true;
+	ok &= readConcreteParameter(state, 0, &hHeap);
+
+	if (!ok) {
+		if(m_showDebugInfo)
+		s2e()->getDebugStream() << "Could not read hHeap in RtlDestroyHeap"
+				<< '\n';
+		return;
+	}
+
+	if(m_showDebugInfo)
+	s2e()->getMessagesStream(state) << "RtlDestroyHeap: " << "RtlDestroyHeap__hHeap:"
+			<< hexval(hHeap) << '\n';
+	FUNCMON_REGISTER_RETURN_A(state, fns, NtoskrnlHandlers::RtlDestroyHeapRet,
+			hHeap);
+}
+
+void NtoskrnlHandlers::RtlDestroyHeapRet(S2EExecutionState* state,
+		uint32_t hHeap) {
+	if(m_showDebugInfo) HANDLER_TRACE_RETURN();
+	if (!NtSuccess(g_s2e, state)) {
+		HANDLER_TRACE_FCNFAILED();
+		return;
+	} else {
+
+	}
+	if(m_heapMonitor) m_heapMonitor->HeapDestroy(state, hHeap);
+}
+
+/*
+ LPVOID HeapAlloc(
+ HANDLE hHeap,
+ DWORD dwFlags,
+ SIZE_T dwBytes
+ );
+PVOID RtlAllocateHeap(
+  _In_      PVOID HeapHandle,
+  _In_opt_  ULONG Flags,
+  _In_      SIZE_T Size
+);
+ */
+void NtoskrnlHandlers::RtlAllocateHeap(S2EExecutionState* state,
+		FunctionMonitorState *fns) {
+	//if (!calledFromModule(state)) {
+	//	return;
+	//}
+
+	//Invoke this function in all contexts
+	uint32_t hHeap, dwFlags, dwBytes;
+	bool ok = true;
+	ok &= readConcreteParameter(state, 0, &hHeap); //hHeap
+	ok &= readConcreteParameter(state, 1, &dwFlags); //hHeap
+	ok &= readConcreteParameter(state, 2, &dwBytes); //dwBytes
+
+	if (!ok) {
+		if(m_showDebugInfo)
+		s2e()->getDebugStream() << "Could not read parameters in RtlAllocateHeap"
+				<< '\n';
+		return;
+	}
+
+	//TODO 读取参数值，维护堆结构
+	if(m_showDebugInfo)
+	s2e()->getMessagesStream(state) << "RtlAllocateHeap: " << "RtlAllocateHeap__hHeap："
+			<< hexval(hHeap) << " dwBytes：" << hexval(dwBytes) << '\n';
+	FUNCMON_REGISTER_RETURN_A(state, fns, NtoskrnlHandlers::RtlAllocateHeapRet,
+			hHeap, dwFlags, dwBytes);
+}
+
+void NtoskrnlHandlers::RtlAllocateHeapRet(S2EExecutionState* state, uint32_t hHeap,
+		uint32_t dwFlags, uint32_t dwBytes) {
+	if(m_showDebugInfo) HANDLER_TRACE_RETURN();
+
+	uint32_t hreturn; //LPVOID
+	if (!readCpuRegisterEAXConcrete(state, &hreturn)) { //如果读不到具体内存，再读符号内存
+		klee::ref<klee::Expr> eax = readCpuRegisterEAX(state);
+		if(m_showDebugInfo)
+		s2e()->getMessagesStream(state) << "RtlAllocateHeap return symbolic: " << eax
+				<< '\n';
+	} else {
+		if(m_showDebugInfo)
+		s2e()->getMessagesStream(state) << "RtlAllocateHeap return concrete: "
+				<< hexval(hreturn) << '\n';
+	}
+	if(m_heapMonitor) m_heapMonitor->HeapAlloc(state, hreturn, hHeap, dwFlags, dwBytes);
+}
+/*
+ BOOL HeapFree(
+ HANDLE hHeap,
+ DWORD dwFlags,
+ LPVOID lpMem
+ );
+BOOLEAN RtlFreeHeap(
+  _In_      PVOID HeapHandle,
+  _In_opt_  ULONG Flags,
+  _In_      PVOID HeapBase
+);
+ */
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+void NtoskrnlHandlers::RtlFreeHeap(S2EExecutionState* state,
+		FunctionMonitorState *fns) {
+	//if (!calledFromModule(state)) {
+	//	return;
+	//}
+	if(m_showDebugInfo) HANDLER_TRACE_CALL();
+
+	uint32_t hHeap, dwFlags, lpMem;
+	bool ok = true;
+	ok &= readConcreteParameter(state, 0, &hHeap); //hHeap
+	ok &= readConcreteParameter(state, 1, &dwFlags); //dwFlags
+	ok &= readConcreteParameter(state, 2, &lpMem); //lpMem
+
+	if(m_showDebugInfo)
+	s2e()->getMessagesStream(state) << "RtlFreeHeap: " << "RtlFreeHeap__hHeap："
+			<< hexval(hHeap) << " lpMem：" << hexval(lpMem) << '\n';
+
+	FUNCMON_REGISTER_RETURN_A(state, m_functionMonitor,
+			NtoskrnlHandlers::RtlFreeHeapRet, hHeap, dwFlags, lpMem);
+}
+
+void NtoskrnlHandlers::RtlFreeHeapRet(S2EExecutionState* state, uint32_t hHeap,
+		uint32_t dwFlags, uint32_t lpMem) {
+	if(m_showDebugInfo) HANDLER_TRACE_RETURN();
+
+	if (!NtSuccess(g_s2e, state)) {
+		HANDLER_TRACE_FCNFAILED();
+		return;
+	} else {
+
+	}
+	if(m_heapMonitor) m_heapMonitor->HeapFree(state, hHeap, dwFlags, lpMem);
+}
+
+/*
+ pEPROCESS IoGetCurrentProcess();
+ */
+void NtoskrnlHandlers::IoGetCurrentProcess(S2EExecutionState* state,
+		FunctionMonitorState *fns) {
+	if (!calledFromModule(state)) {
+		return;
+	}
+	if(m_showDebugInfo)
+	s2e()->getMessagesStream(state) << "IoGetCurrentProcess: " << "IoGetCurrentProcess"
+			<<'\n';
+	FUNCMON_REGISTER_RETURN(state, fns, NtoskrnlHandlers::IoGetCurrentProcessRet);
+}
+
+void NtoskrnlHandlers::IoGetCurrentProcessRet(S2EExecutionState* state) {
+	if(m_showDebugInfo) HANDLER_TRACE_RETURN();
+	uint32_t pEPROCESS; //LPVOID
+	if (!readCpuRegisterEAXConcrete(state, &pEPROCESS)) { //如果读不到具体内存，再读符号内存
+		klee::ref<klee::Expr> eax = readCpuRegisterEAX(state);
+		if (m_showDebugInfo)
+			s2e()->getMessagesStream(state)
+					<< "IoGetCurrentProcess return symbolic: " << eax << '\n';
+	} else {
+		if (m_showDebugInfo)
+			s2e()->getMessagesStream(state)
+					<< "IoGetCurrentProcess return concrete: " << hexval(pEPROCESS)
+					<< '\n';
+
+		if(m_processIoGetCurrentProcess){
+			uint32_t pos = 0;
+			uint32_t pnamestr=0;
+			if(m_windowsMonitor->GetVersion()==WindowsMonitor::XPSP3){
+				//确定pos位置
+				uint32_t peb=0;
+				uint32_t image=0;
+
+				if (!state->readMemoryConcrete((pEPROCESS + 0x1B0), &peb, 4)) {
+					g_s2e->getDebugStream() << "没有读到pEPROCESS+0x1B0" << '\n';
+				} else {
+					if (!state->readMemoryConcrete((peb + 0x10), &image, 4)) {
+						g_s2e->getDebugStream() << "没有读到peb + 0x10"
+								<< '\n';
+					} else {
+						pos = image + 0x3c;
+						if (!state->readMemoryConcrete((pos), &pnamestr, 4)) {
+							g_s2e->getDebugStream() << "没有读到 pnamestr" << '\n';
+						} else {
+							pos = pnamestr;
+						}
+					}
+				}
+			}else if(m_windowsMonitor->GetVersion()==WindowsMonitor::XPSP3CN){
+				//确定pos位置
+				uint32_t peb = 0;
+				uint32_t image = 0;
+				if (!state->readMemoryConcrete((pEPROCESS + 0x1B0), &peb, 4)) {
+					g_s2e->getDebugStream() << "没有读到pEPROCESS+0x1B0" << '\n';
+				} else {
+					if (!state->readMemoryConcrete((peb + 0x10), &image, 4)) {
+						g_s2e->getDebugStream() << "没有读到peb + 0x10"
+								<< '\n';
+					} else {
+						pos = image + 0x3c;
+						if (!state->readMemoryConcrete((pos), &pnamestr, 4)) {
+										g_s2e->getDebugStream() << "没有读到 pnamestr" << '\n';
+						}else{
+							pos = pnamestr;
+						}
+					}
+				}
+			}else if(m_windowsMonitor->GetVersion()==WindowsMonitor::WIN7X86){//TODO check win7
+				//确定pos位置
+				uint32_t peb = 0;
+				uint32_t image = 0;
+				if (!state->readMemoryConcrete((pEPROCESS + 0x1B0), &peb, 4)) {
+					g_s2e->getDebugStream() << "没有读到pEPROCESS+0x1B0" << '\n';
+				} else {
+					if (!state->readMemoryConcrete((peb + 0x10), &image, 4)) {
+						g_s2e->getDebugStream() << "没有读到peb + 0x10"
+								<< '\n';
+					} else {
+						pos = image + 0x3c;
+						if (!state->readMemoryConcrete((pos), &pnamestr, 4)) {
+										g_s2e->getDebugStream() << "没有读到 pnamestr" << '\n';
+						}else{
+							pos = pnamestr;
+						}
+					}
+				}
+			}
+			pos = pos + m_posoffset;
+			std::stringstream namestream;
+			namestream << "pEPROCESS_" << hexval(pos);
+			uint8_t buf;
+			klee::ref<klee::Expr> v = state->readMemory((pos), klee::Expr::Int8);
+			if(!v.isNull()&& !isa<klee::ConstantExpr>(v)){
+				return;//已经是符号数据了
+			}
+			if (!state->readMemoryConcrete((pos), &buf, 1)) {
+				buf = 0;
+			}
+			std::string _imagestr;
+			if (!state->readString(pos, _imagestr)) {
+				std::stringstream ss;
+				ss << "没有读到 _imagestr at " << hexval(pos) << '\n';
+				if (m_showDebugInfo) {
+					s2e()->getMessagesStream(state) << ss.str();
+				}
+				return;
+			} else {
+			}
+			klee::ref<klee::Expr> val = state->createSymbolicValue(
+					namestream.str(), klee::Expr::Int8); //
+			if (!state->writeMemory((pos), val)) {
+				std::stringstream ss;
+				g_s2e->getDebugStream()
+						<< "writeMemorySymb: Could not write to memory at address "
+						<< hexval(pos);
+			} else {
+				g_s2e->getDebugStream()
+						<< "NtoskrnlHandlers:Write symbolic value to memory location"
+						<< " " << hexval(pos) << " of size " << 1
+						<< " and default value=0x " << hexval(buf) << '\n';
+				if (m_showDebugInfo) {
+					std::stringstream ss;
+					ss << "写入符号数据：location" << " " << hexval(pos) << " of size "
+							<< 1 << " 默认值 value=0x " << hexval(buf) << '\n';
+					s2e()->getMessagesStream(state) << ss.str();
+				}
+			}
+		}
+	}
+}
 }
 }

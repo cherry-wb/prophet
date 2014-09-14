@@ -55,7 +55,7 @@ extern "C" {
 
 #include "NdisHandlers.h"
 #include "NtoskrnlHandlers.h"
-
+#include <s2e/Plugins/EXT/LibraryHandlers.h>
 #include <sstream>
 
 using namespace s2e::windows;
@@ -83,20 +83,33 @@ void WindowsApi::initialize()
     parseSpecificConsistency(getConfigKey());
 }
 
-void WindowsApi::registerImports(S2EExecutionState *state, const ModuleDescriptor &module)
+bool  WindowsApi::registerImports(S2EExecutionState *state, const ModuleDescriptor &module)
 {
     Imports imports;
     if (!m_windowsMonitor->getImports(state, module, imports)) {
         s2e()->getWarningsStream() << "WindowsApi: Could not read imports for module ";
         module.Print(s2e()->getWarningsStream());
-        return;
+        return false;
+    }else{
+    	s2e()->getDebugStream() << "imports for module " << module.Name << " read imports.size="<< imports.size() <<".\n";
+    	if(imports.size()==0){
+    		return false;
+    	}
     }
-
+    bool ok = false;
     //Scan the imports and notify all handler plugins that we need to intercept functions
     foreach2(it, imports.begin(), imports.end()) {
-        const std::string &libraryName = (*it).first;
+    	const std::string &libraryNameorg = (*it).first;
         const ImportedFunctions &functions = (*it).second;
-
+    	std::string libraryName(libraryNameorg);
+        std::transform(libraryName.begin(), libraryName.end(),libraryName.begin(), ::tolower);
+        foreach2(fit, functions.begin(), functions.end()) {
+               const std::string &funcName = (*fit).first;
+               std::string composedName = libraryName + "!";
+               composedName = composedName + funcName;
+               uint64_t address = (*fit).second;
+               s2e()->getMessagesStream() << "ImportedFunction："<<composedName.c_str() << " address："<<hexval(address)<<'\n';
+        }
         //XXX: Check that these names are actually in the kernel...
         if (libraryName == "ndis.sys") {
             NdisHandlers *ndisHandlers = static_cast<NdisHandlers*>(s2e()->getPlugin("NdisHandlers"));
@@ -107,7 +120,7 @@ void WindowsApi::registerImports(S2EExecutionState *state, const ModuleDescripto
                 ndisHandlers->registerCaller(state, module);
                 ndisHandlers->registerImportedVariables(state, module, functions);
             }
-
+            ok = true;
         }else if (libraryName == "ntoskrnl.exe") {
             NtoskrnlHandlers *ntoskrnlHandlers = static_cast<NtoskrnlHandlers*>(s2e()->getPlugin("NtoskrnlHandlers"));
             if (!ntoskrnlHandlers) {
@@ -117,10 +130,65 @@ void WindowsApi::registerImports(S2EExecutionState *state, const ModuleDescripto
                 ntoskrnlHandlers->registerCaller(state, module);
                 ntoskrnlHandlers->registerImportedVariables(state, module, functions);
             }
-        }
-    }
+            ok = true;
+        }else if (libraryName == "kernel32.dll") {
+        	Plugin *kernel32plugin = s2e()->getPlugin("Kernel32Handlers");
+            if (!kernel32plugin) {
+                s2e()->getWarningsStream(state)
+                    << "could not find plugin " << "Kernel32Handlers" << "\n";
+            }
+            LibraryHandlers *kernel32Handlers = dynamic_cast<LibraryHandlers*>(kernel32plugin);
+			if (!kernel32Handlers) {
+				s2e()->getWarningsStream() << "Kernel32Handlers not activated!" << '\n';
+			} else {
+				kernel32Handlers->IregisterEntryPoints(state, functions);
+				kernel32Handlers->IregisterCaller(state, module);
+				kernel32Handlers->IregisterImportedVariables(state, module, functions);
+			}
+			 ok = true;
+			}else if (libraryName == "ws2_32.dll") {
+				Plugin *ws232plugin = s2e()->getPlugin(
+												"Ws232Handlers");
+			   if (!ws232plugin) {
+						s2e()->getWarningsStream(state)
+							<< "could not find plugin " << "Ws232Handlers" << "\n";
+					}
+				LibraryHandlers *ws232Handlers =
+						 dynamic_cast<LibraryHandlers*>(ws232plugin);
+				if (!ws232Handlers) {
+					s2e()->getWarningsStream() << "ws232Handlers not activated!"
+							<< '\n';
+				} else {
+					ws232Handlers->IregisterEntryPoints(state, functions);
+					ws232Handlers->IregisterCaller(state, module);
+					ws232Handlers->IregisterImportedVariables(state, module,
+							functions);
+				}
+				s2e()->getWarningsStream() << "ws232Handlers installed ok!"
+										<< '\n';
+				ok = true;
+			}else if (libraryName == "ntdll.dll") {
+				Plugin *ntdllplugin = s2e()->getPlugin(
+																"NtdllHandlers");
+			   if (!ntdllplugin) {
+					s2e()->getWarningsStream(state)
+						<< "could not find plugin " << "NtdllHandlers" << "\n";
+				}
+				LibraryHandlers *ntdllHandlers = dynamic_cast<LibraryHandlers*>(ntdllplugin);
+				if (!ntdllHandlers) {
+					s2e()->getWarningsStream() << "NtdllHandlers not activated!"
+							<< '\n';
+				} else {
+					ntdllHandlers->IregisterEntryPoints(state, functions);
+					ntdllHandlers->IregisterCaller(state, module);
+					ntdllHandlers->IregisterImportedVariables(state, module,
+							functions);
+				}
+				ok = true;
+			}
+	}
+	return ok;
 }
-
 void WindowsApi::parseSpecificConsistency(const std::string &key)
 {
     ConfigFile *cfg = s2e()->getConfig();
@@ -142,18 +210,18 @@ void WindowsApi::parseSpecificConsistency(const std::string &key)
 
         ExecutionConsistencyModel consistency;
         consistency = ConsistencyModels::fromString(pairs[1]);
-        if (consistency == OVERCONSTR) {
+        if (consistency == OVERCONSTR && key=="NdisHandlers") {
             s2e()->getWarningsStream() << "NDISHANDLERS: Cannot handle overconstrained for specific functions\n";
             exit(-1);
         }
 
-        if (consistency == NONE) {
+        if (consistency == NONE && key=="NdisHandlers") {
             s2e()->getWarningsStream() << "NDISHANDLERS: Incorrect consistency " << consistency <<
                     " for " << ss.str() << '\n';
             exit(-1);
         }
 
-        s2e()->getDebugStream() << "NDISHANDLERS " << pairs[0] << " will have " << pairs[1] << " consistency" << '\n';
+        s2e()->getDebugStream() << key<< "." << pairs[0] << " will have " << pairs[1] << " consistency" << '\n';
         m_specificConsistency[pairs[0]] = consistency;
     }
 
@@ -250,6 +318,17 @@ uint32_t WindowsApi::getReturnAddress(S2EExecutionState *s)
     } else {
         return 0;
     }
+}
+klee::ref<klee::Expr> WindowsApi::readCpuRegisterEAX(S2EExecutionState *s)
+{
+	klee::ref<klee::Expr> eax = s->readCpuRegister(offsetof(CPUX86State, regs[R_EAX]), klee::Expr::Int32);
+    return eax;
+}
+bool WindowsApi::readCpuRegisterEAXConcrete(S2EExecutionState *s,
+		uint32_t *val) {
+	bool ok;
+	ok = s->readCpuRegisterConcrete(offsetof(CPUX86State, regs[R_EAX]), val,sizeof(*val));
+	return ok;
 }
 
 bool WindowsApi::readConcreteParameter(S2EExecutionState *s, unsigned param, uint32_t *val)

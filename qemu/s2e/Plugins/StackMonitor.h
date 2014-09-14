@@ -76,7 +76,7 @@ public:
 
     bool getFrameInfo(S2EExecutionState *state, uint64_t sp, bool &onTheStack, StackFrameInfo &info) const;
     void dump(S2EExecutionState *state);
-
+    virtual std::stringstream& dump(S2EExecutionState *state,std::stringstream &os,bool issimplify=false);
     bool getCallStacks(S2EExecutionState *state, CallStacks &callStacks) const;
 
     /**

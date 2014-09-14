@@ -4707,3 +4707,6 @@ int monitor_read_block_device_key(Monitor *mon, const char *device,
 
     return monitor_read_bdrv_key_start(mon, bs, completion_cb, opaque);
 }
+int get_keycode_nonstatic(const char *key){
+	return get_keycode(key);
+}

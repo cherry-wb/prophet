@@ -33,84 +33,29 @@
  * All contributors are listed in the S2E-AUTHORS file.
  */
 
-#ifndef __WINDOWS_UM_INTERCEPTOR_H__
-
-#define __WINDOWS_UM_INTERCEPTOR_H__
-
-#include <s2e/Plugins/ModuleDescriptor.h>
+#ifndef S2E_PLUGINS_HeapChecker_H
+#define S2E_PLUGINS_HeapChecker_H
 
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/CorePlugin.h>
-#include <s2e/Plugins/OSMonitor.h>
+#include <s2e/S2EExecutionState.h>
+#include "HeapMonitor.h"
+#include <s2e/Plugins/MemoryChecker.h>
 #include <s2e/Plugins/ModuleExecutionDetector.h>
-
-#include "WindowsMonitor.h"
-
+#include <s2e/Plugins/OSMonitor.h>
+#include <s2e/Plugins/StackMonitor.h>
+#include <s2e/Plugins/Annotation.h>
 namespace s2e {
 namespace plugins {
 
-class WindowsUmInterceptor
+class HeapChecker : public Plugin
 {
-private:
-  WindowsMonitor *m_Os;
-  ModuleExecutionDetector *m_detector;
-
-  typedef std::set<ModuleDescriptor*> HookedLibrarySet;
-  typedef std::set<std::string> StringSet;
-
-
-  uint64_t m_ASBase;
-  uint64_t m_ASSize;
-  
-  enum EUmTracingState {
-    SEARCH_PROCESS,
-    WAIT_PROCESS_INIT,
-    WAIT_LIBRARY_LOAD,
-    LOAD_DONE
-  };
-
-  enum EUmTracingState m_TracingState;
-
-  uint64_t m_Cr3;
-  uint64_t m_PrevCr3;
-  uint64_t m_HookedCr3;
-  uint64_t m_LdrAddr; 
-  uint64_t m_ProcBase;
-  
-  ModuleDescriptor::MDSet m_LoadedLibraries;
-
-  //IDataStructureSpy::Processes m_ProcList;
-
-  std::string m_ProcessName;
-  std::map<std::string, ModuleDescriptor> m_Modules;
-
-  bool WaitForProcessInit(S2EExecutionState *state);
-  bool FindModules(S2EExecutionState *State);
-  bool InitImports();
-
-  void NotifyLoadedProcesses(S2EExecutionState *state);
-  void NotifyModuleLoad(S2EExecutionState *state, ModuleDescriptor &Library);
-
-  bool CatchModuleUnloadBase(S2EExecutionState *State, uint64_t pLdrEntry);
-  bool CatchModuleUnloadServer2008(S2EExecutionState *State);
-  bool CatchModuleUnloadXPSP3(S2EExecutionState *State);
-
-  bool CatchProcessTerminationXp(S2EExecutionState *State);
-  bool CatchProcessTerminationServer2008(S2EExecutionState *State);
-
 public:
-  WindowsUmInterceptor(WindowsMonitor *Monitor);
-  virtual ~WindowsUmInterceptor();
-
-  bool CatchModuleLoad(S2EExecutionState *State);
-  bool CatchProcessTermination(S2EExecutionState *State);
-  bool CatchModuleUnload(S2EExecutionState *State);
-  
-  bool GetPids(S2EExecutionState *State, PidSet &out);
+    HeapChecker(S2E* s2e): Plugin(s2e) {
+    }
 };
 
+} // namespace plugins
+} // namespace s2e
 
-}
-}
-
-#endif
+#endif // S2E_PLUGINS_HeapChecker_H

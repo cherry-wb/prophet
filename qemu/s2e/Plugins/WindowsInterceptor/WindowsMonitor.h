@@ -42,7 +42,7 @@
 #include <s2e/Plugin.h>
 #include <s2e/Plugins/CorePlugin.h>
 #include <s2e/Plugins/OSMonitor.h>
-
+#include <s2e/Plugins/BaseInstructions.h>
 #include "WindowsImage.h"
 
 #include <inttypes.h>
@@ -56,6 +56,7 @@ namespace plugins {
 class WindowsUmInterceptor;
 class WindowsKmInterceptor;
 class WindowsSpy;
+class BaseInstructionsPluginInvokerInterface;
 
 typedef std::set<uint64_t> PidSet;
 typedef std::map<std::string, uint64_t> ModuleSizeMap;
@@ -63,7 +64,7 @@ typedef std::map<std::string, uint64_t> ModuleSizeMap;
 class WindowsMonitor:public OSMonitor
 {
     S2E_PLUGIN
-
+    friend class WindowsUmInterceptor;
 public:
 
     //Do not change the order of the constants
@@ -73,6 +74,8 @@ public:
         XPSP2_CHK=2,
         XPSP3_CHK=3,
         SRV2008SP2=4,
+        XPSP3CN=5,
+        WIN7X86=6,
         MAXVER
     }EWinVer;
 
@@ -115,7 +118,7 @@ private:
 
     static uint64_t s_offEprocAllThreads[];
     static uint64_t s_offEthreadLink[];
-
+    static uint64_t s_KPCR_ADDRESS[];
 
     EWinVer m_Version;
     bool m_UserMode, m_KernelMode;
@@ -228,6 +231,7 @@ public:
     virtual bool isKernelAddress(uint64_t pc) const;
     virtual uint64_t getPid(S2EExecutionState *s, uint64_t pc);
     virtual bool getCurrentStack(S2EExecutionState *s, uint64_t *base, uint64_t *size);
+    virtual bool H_getCurrentStack(S2EExecutionState *state, uint64_t *base, uint64_t *size);
 
     bool getThreadStack(S2EExecutionState *state, uint64_t pThread, uint64_t *base, uint64_t *size);
     bool getDpcStack(S2EExecutionState *state, uint64_t *base, uint64_t *size);

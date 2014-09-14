@@ -58,6 +58,89 @@ void X86FunctionMonitor::initialize()
     s2e()->getCorePlugin()->onTranslateJumpStart.connect(
             sigc::mem_fun(*this, &X86FunctionMonitor::slotTranslateJumpStart));
 
+    ConfigFile *cfg = s2e()->getConfig();
+     ConfigFile::string_list pollingEntries = cfg->getListKeys(
+ 			getConfigKey() + ".forceCheckRanges");
+
+ 	if (pollingEntries.size() == 0) {
+ 		Range rg;
+ 		rg.start = 0x00000000;
+ 		rg.end = 0x00000000;
+ 		m_forcecheckranges.insert(rg);
+ 	}
+
+ 	foreach2(it, pollingEntries.begin(), pollingEntries.end())
+ 	{
+ 		std::stringstream ss1;
+ 		ss1 << getConfigKey() << ".forceCheckRanges" << "." << *it;
+ 		ConfigFile::integer_list il = cfg->getIntegerList(ss1.str());
+ 		if (il.size() != 2) {
+ 			s2e()->getWarningsStream() << "Range entry " << ss1.str()
+ 					<< " must be of the form {startPc, endPc} format" << '\n';
+ 			continue;
+ 		}
+
+ 		bool ok = false;
+ 		uint64_t start = cfg->getInt(ss1.str() + "[1]", 0, &ok);
+ 		if (!ok) {
+ 			s2e()->getWarningsStream() << "FunctionMonitor could not read "
+ 					<< ss1.str() << "[0]" << '\n';
+ 			continue;
+ 		}
+
+ 		uint64_t end = cfg->getInt(ss1.str() + "[2]", 0, &ok);
+ 		if (!ok) {
+ 			s2e()->getWarningsStream() << "FunctionMonitor could not read "
+ 					<< ss1.str() << "[1]" << '\n';
+ 			continue;
+ 		}
+ 		//Convert the format to native address
+ 		Range rg;
+ 		rg.start = start;
+ 		rg.end = end;
+ 		m_forcecheckranges.insert(rg);
+ 	}
+ 	ConfigFile::string_list skipEntries = cfg->getListKeys(
+ 			getConfigKey() + ".skipCheckRanges");
+
+ 	if (skipEntries.size() == 0) {
+ 		Range rg;
+ 		rg.start = 0x00000000;
+ 		rg.end = 0x00000000;
+ 		m_skipcheckranges.insert(rg);
+ 	}
+
+ 	foreach2(it, skipEntries.begin(), skipEntries.end())
+ 	{
+ 		std::stringstream ss1;
+ 		ss1 << getConfigKey() << ".skipCheckRanges" << "." << *it;
+ 		ConfigFile::integer_list il = cfg->getIntegerList(ss1.str());
+ 		if (il.size() != 2) {
+ 			s2e()->getWarningsStream() << "Range entry " << ss1.str()
+ 					<< " must be of the form {startPc, endPc} format" << '\n';
+ 			continue;
+ 		}
+
+ 		bool ok = false;
+ 		uint64_t start = cfg->getInt(ss1.str() + "[1]", 0, &ok);
+ 		if (!ok) {
+ 			s2e()->getWarningsStream() << "FunctionMonitor could not read "
+ 					<< ss1.str() << "[0]" << '\n';
+ 			continue;
+ 		}
+
+ 		uint64_t end = cfg->getInt(ss1.str() + "[2]", 0, &ok);
+ 		if (!ok) {
+ 			s2e()->getWarningsStream() << "FunctionMonitor could not read "
+ 					<< ss1.str() << "[1]" << '\n';
+ 			continue;
+ 		}
+ 		//Convert the format to native address
+ 		Range rg;
+ 		rg.start = start;
+ 		rg.end = end;
+ 		m_skipcheckranges.insert(rg);
+ 	}
 #if 0
     //Cannot do this here, because we do not have an execution state at this point.
     if(s2e()->getConfig()->getBool(getConfigKey() + ".enableTracing")) {
@@ -67,6 +150,7 @@ void X86FunctionMonitor::initialize()
 #endif
 
     m_monitor = static_cast<OSMonitor*>(s2e()->getPlugin("Interceptor"));
+    m_detector =  static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
 }
 
 //XXX: Implement onmoduleunload to automatically clear all call signals
@@ -75,8 +159,22 @@ X86FunctionMonitor::CallSignal* X86FunctionMonitor::getCallSignal(
         uint64_t eip, uint64_t cr3)
 {
     DECLARE_PLUGINSTATE(X86FunctionMonitorState, state);
+    Range rg;
+	rg.start = eip;
+	rg.end = eip;
+	if(m_forcecheckranges.find(rg) == m_forcecheckranges.end())
+	{
+		m_forcecheckranges.insert(rg);
+	}
 
     return plgState->getCallSignal(eip, cr3);
+}
+
+X86FunctionMonitor::CallSignals X86FunctionMonitor::getAllCallSignal(
+		S2EExecutionState *state, uint64_t cr3) {
+	DECLARE_PLUGINSTATE(X86FunctionMonitorState, state);
+
+	return plgState->getAllCallSignal(cr3);
 }
 
 void X86FunctionMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
@@ -90,19 +188,66 @@ void X86FunctionMonitor::slotTranslateBlockEnd(ExecutionSignal *signal,
 	}
     /* We intercept all call and ret translation blocks */
     if (tb->s2e_tb_type == TB_CALL || tb->s2e_tb_type == TB_CALL_IND || isimporttable) {
+    	bool forcetocontinue = true;
+    	if(m_detector){
+			forcetocontinue = m_detector->goahead(state, pc);
+		}else{
+			m_detector =  static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
+		}
+		foreach2(rgit, m_skipcheckranges.begin(), m_skipcheckranges.end())
+		{
+			if ((pc >= (*rgit).start) && (pc <= (*rgit).end)) {
+				forcetocontinue = false;
+				break;
+			}
+		}
+
+		foreach2(rgit, m_forcecheckranges.begin(), m_forcecheckranges.end())
+		{
+			if ((pc >= (*rgit).start) && (pc <= (*rgit).end)) {
+				forcetocontinue = true;
+				break;
+			}
+		}
+
+		if(forcetocontinue){
         signal->connect(sigc::mem_fun(*this,
                             &X86FunctionMonitor::slotCall));
+		}
     }
 }
 
 void X86FunctionMonitor::slotTranslateJumpStart(ExecutionSignal *signal,
                                              S2EExecutionState *state,
                                              TranslationBlock *,
-                                             uint64_t, int jump_type)
+                                             uint64_t pc, int jump_type)
 {
     if(jump_type == JT_RET || jump_type == JT_LRET) {
-        signal->connect(sigc::mem_fun(*this,
-                            &X86FunctionMonitor::slotRet));
+    	bool forcetocontinue = true;
+		if(m_detector){
+    		forcetocontinue = m_detector->goahead(state, pc);
+    	}else{
+    		m_detector =  static_cast<ModuleExecutionDetector*>(s2e()->getPlugin("ModuleExecutionDetector"));
+    	}
+		foreach2(rgit, m_skipcheckranges.begin(), m_skipcheckranges.end())
+		{
+			if ((state->getPc() >= (*rgit).start) && (state->getPc() <= (*rgit).end)) {
+				forcetocontinue = false;
+				break;
+			}
+		}
+		foreach2(rgit, m_forcecheckranges.begin(), m_forcecheckranges.end())
+		{
+			if ((state->getPc() >= (*rgit).start)
+					&& (state->getPc() <= (*rgit).end)) {
+				forcetocontinue = true;
+				break;
+			}
+		}
+		if (forcetocontinue) {
+			 signal->connect(sigc::mem_fun(*this,
+			                            &X86FunctionMonitor::slotRet));
+		}
     }
 }
 
@@ -177,7 +322,7 @@ X86FunctionMonitorState::~X86FunctionMonitorState()
 X86FunctionMonitorState* X86FunctionMonitorState::clone() const
 {
     X86FunctionMonitorState *ret = new X86FunctionMonitorState(*this);
-    m_plugin->s2e()->getDebugStream() << "Forking FunctionMonitorState ret=" << hexval(ret) << '\n';
+//    m_plugin->s2e()->getDebugStream() << "Forking FunctionMonitorState ret=" << hexval(ret) << '\n';
     assert(ret->m_returnDescriptors.size() == m_returnDescriptors.size());
     return ret;
 }
@@ -208,6 +353,35 @@ X86FunctionMonitor::CallSignal* X86FunctionMonitorState::getCallSignal(
     return &it->second.signal;
 }
 
+X86FunctionMonitor::CallSignals X86FunctionMonitorState::getAllCallSignal(
+		uint64_t cr3) {
+	X86FunctionMonitor::CallSignals callSignals;
+	std::pair<CallDescriptorsMap::iterator, CallDescriptorsMap::iterator> range =
+			m_callDescriptors.equal_range(-1);
+
+	for (CallDescriptorsMap::iterator it = range.first; it != range.second;
+			++it) {
+		if(it->second.cr3 == cr3)
+			callSignals.insert(&it->second.signal);
+	}
+	if (callSignals.size() == 0) {
+		CallDescriptor descriptor = { cr3, X86FunctionMonitor::CallSignal() };
+		m_newCallDescriptors.insert(std::make_pair((uint64_t) -1, descriptor));
+		if (!m_newCallDescriptors.empty()) {
+					m_callDescriptors.insert(m_newCallDescriptors.begin(),
+							m_newCallDescriptors.end());
+					m_newCallDescriptors.clear();
+				}
+		range = m_callDescriptors.equal_range((uint64_t) -1);
+		for (CallDescriptorsMap::iterator it = range.first; it != range.second;
+				++it) {
+			if (it->second.cr3 == cr3)
+				callSignals.insert(&it->second.signal);
+		}
+
+	}
+	return callSignals;
+}
 
 void X86FunctionMonitorState::slotCall(S2EExecutionState *state, uint64_t pc)
 {

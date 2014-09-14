@@ -73,6 +73,7 @@ struct ModuleExecutionCfg
     std::string moduleName;
     bool kernelMode;
     std::string context;
+    RangeEntries ranges;
 };
 
 struct ModuleExecCfgById
@@ -154,6 +155,8 @@ private:
 
     ConfiguredModulesById m_ConfiguredModulesId;
     ConfiguredModulesByName m_ConfiguredModulesName;
+    std::string m_mainmodule;
+    uint64_t  m_mainmoduleIndentity;
 
     bool m_TrackAllModules;
     bool m_ConfigureAllModules;
@@ -199,7 +202,8 @@ private:
     void processUnloadListener(
         S2EExecutionState* state,
         const  ProcessDescriptor &pd);
-
+	void connectExecution(const ModuleDescriptor* currentModule, uint64_t pc,
+			ExecutionSignal* signal);
 public:
     ModuleExecutionDetector(S2E* s2e): Plugin(s2e) {}
     virtual ~ModuleExecutionDetector();
@@ -220,7 +224,30 @@ public:
     }
 
     bool isModuleConfigured(const std::string &moduleId) const;
+    bool printModuleConfigured() const;
+    bool goahead(
+    			const ModuleDescriptor* currentModule, uint64_t pc);
+        bool goahead(
+    			S2EExecutionState *state, uint64_t pc,bool isDataMemoryAccess = false);
 
+    	uint64_t getMainmoduleIndentity() const {
+    		return m_mainmoduleIndentity;
+    	}
+    	bool isKernelMode(){
+    		if(m_Monitor){
+    			return m_Monitor->isKernelMode();
+    		}else{
+    			return false;
+    		}
+    	}
+
+    	const std::string& getMainmodule() const {
+    		return m_mainmodule;
+    	}
+
+    	void setMainmoduleIndentity(uint64_t mainmoduleIndentity) {
+    		m_mainmoduleIndentity = mainmoduleIndentity;
+    	}
     friend class ModuleTransitionState;
 };
 

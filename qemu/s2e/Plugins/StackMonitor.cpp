@@ -430,7 +430,9 @@ void StackMonitor::dump(S2EExecutionState *state)
     DECLARE_PLUGINSTATE(StackMonitorState, state);
     plgState->dump(state);
 }
-
+std::stringstream&  StackMonitor::dump(S2EExecutionState *state,std::stringstream &os,bool issimplify){
+	return os;
+}
 bool StackMonitor::getCallStacks(S2EExecutionState *state, CallStacks &callStacks) const
 {
     DECLARE_PLUGINSTATE(StackMonitorState, state);

@@ -113,6 +113,9 @@ public:
     static bool writeParameter(S2EExecutionState *s, unsigned param, klee::ref<klee::Expr> val);
     uint32_t getReturnAddress(S2EExecutionState *s);
 
+    klee::ref<klee::Expr> readCpuRegisterEAX(S2EExecutionState *s);
+    bool readCpuRegisterEAXConcrete(S2EExecutionState *s,
+    		uint32_t *val);
 
     //Maps a function name to a consistency
     typedef std::map<std::string, ExecutionConsistencyModel> ConsistencyMap;
@@ -159,7 +162,7 @@ protected:
     //Provides a common method for configuring consistency for Windows modules
     void parseSpecificConsistency(const std::string &key);
 
-    void registerImports(S2EExecutionState *state, const ModuleDescriptor &module);    
+    bool registerImports(S2EExecutionState *state, const ModuleDescriptor &module);
     virtual void unregisterEntryPoints(S2EExecutionState *state, const ModuleDescriptor &module) = 0;
     virtual void unregisterCaller(S2EExecutionState *state, const ModuleDescriptor &modDesc) = 0;
 
@@ -328,7 +331,9 @@ public:
         }
 
         FunctionMonitor::CallSignal* cs;
-        cs = m_functionMonitor->getCallSignal(state, address, 0);
+        s2e()->getDebugStream() << "FunctionMonitor signal added for address: " << hexval(address) << '\n';
+        uint64_t cr3 = m_windowsMonitor->getPid(state, address);
+        cs = m_functionMonitor->getCallSignal(state, address, cr3);
         cs->connect(sigc::mem_fun(*static_cast<ANNOTATIONS_PLUGIN*>(this), handler));
         return true;
     }
@@ -347,7 +352,9 @@ public:
 
         FunctionMonitor::CallSignal* cs;
         //XXX: All these zeros for cr3 must be fixed!
-        cs = m_functionMonitor->getCallSignal(state, address, 0);
+        s2e()->getDebugStream() << "FunctionMonitor(template) signal added for address: " << hexval(address) << '\n';
+	   uint64_t cr3 = m_windowsMonitor->getPid(state, address);
+        cs = m_functionMonitor->getCallSignal(state, address, cr3);
         cs->connect(sigc::bind(sigc::mem_fun(*static_cast<ANNOTATIONS_PLUGIN*>(this), handler), t1));
         return true;
     }
