@@ -62,7 +62,7 @@ StackFrame::~StackFrame() {
 /***/
 
 ExecutionState::ExecutionState(KFunction *kf) 
-  : m_shouldbedeleted(false),fakeState(false),
+  : m_shouldbedeleted(false), m_is_carry_on_state(false), fakeState(false),
     underConstrained(false),
     depth(0),
     pc(kf->instructions),
@@ -82,7 +82,7 @@ ExecutionState::ExecutionState(KFunction *kf)
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions) 
-  : m_shouldbedeleted(false),fakeState(true),
+  : m_shouldbedeleted(false), m_is_carry_on_state(false), fakeState(true),
     underConstrained(false),
     constraints(assumptions),
     queryCost(0.),

@@ -250,7 +250,7 @@ ConcolicMode("use-concolic-execution",
 //Concolic mode is the default because it works better than symbex.
 cl::opt<bool>
 TaintMode("use-taint-execution",
-               cl::desc("taint execution mode, just as Concolic "),  cl::init(false));
+               cl::desc("taint execution mode,  just as Concolic "),  cl::init(false));
 
 cl::opt<bool>
 DebugConstraints("debug-constraints",
@@ -955,33 +955,6 @@ S2EExecutor::~S2EExecutor()
     if(statsTracker)
         statsTracker->done();
 }
-S2EExecutionState* S2EExecutor::createInitialState4Deserialize() {
-
-	/**/
-	S2EExecutionState *state = g_s2e_ini_state->getCopy(); //CHECK cherry
-	//s2e_init_device_state(state);
-	//initializeExecution(state, m_executeAlwaysKlee);
-	//registerDirtyMask(state,m_registerDirtyMask_host_address,m_registerDirtyMask_size);
-
-	state->m_stateID = g_s2e->fetchAndIncrementStateId();
-	state->coveredNew = false;
-	state->coveredLines.clear();
-	state->concolics.clear();
-
-	state->m_runningConcrete = false;
-	state->m_active = false;
-	processTree = new PTree(state);
-	state->ptreeNode = processTree->root;
-
-	processTree->activate(state->ptreeNode);
-	states.insert(state);
-	std::set<ExecutionState*> tmp;
-	tmp.insert(state);
-	state->m_forcetoadd = true;
-	searcher->update(0, tmp, std::set<ExecutionState*>());
-
-		return state;
-}
 S2EExecutionState* S2EExecutor::createInitialState()
 {
     assert(!processTree);
@@ -1587,14 +1560,12 @@ S2EExecutionState* S2EExecutor::selectNextState(S2EExecutionState *state)
 
     if(newState != state) {
         g_s2e->getCorePlugin()->onStateSwitch.emit(state, newState);
-        if(!newState->m_replaying){
 			vm_stop(RUN_STATE_SAVE_VM);
 			doStateSwitch(state, newState);
 			vm_start();
-		}else{
-			vm_stop(RUN_STATE_SAVE_VM);
-			doStateSwitch(state, newState);
-			vm_start();
+		g_s2e->getCorePlugin()->onStateSwitchEnd.emit(state, newState);
+		if(newState->m_is_carry_on_state){
+			newState = selectNextState(newState);
 		}
     }
 
@@ -2103,7 +2074,6 @@ void S2EExecutor::deleteState(klee::ExecutionState *state)
     processTree->remove(state->ptreeNode);
     m_deletedStates.push_back(static_cast<S2EExecutionState*>(state));
 }
-
 void S2EExecutor::doStateFork(S2EExecutionState *originalState,
                  const vector<S2EExecutionState*>& newStates,
                  const vector<ref<Expr> >& newConditions)
@@ -2123,7 +2093,11 @@ void S2EExecutor::doStateFork(S2EExecutionState *originalState,
         }
 
         if(newState != originalState) {
-            newState->m_needFinalizeTBExec = true;
+        	if(!originalState->m_preparingstate)
+        		newState->m_needFinalizeTBExec = true;
+        	else
+        		newState->m_needFinalizeTBExec = false;
+
             newState->m_active = false;
         }
     }
@@ -2185,13 +2159,13 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 	   bool currentce = false;
 	   S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(&current);
 	   if (!isa<klee::ConstantExpr>(condition)) {
-		   if (s2eState->m_replaying) { //回放只是用来选择状态用的
+		   if (s2eState->m_replaying && !s2eState->m_preparingstate) { //回放只是用来选择状态用的
 				currentce = s2eState->m_forkrecord4repaly.front();
 				s2eState->m_forkrecord4repaly.pop_front();
 			}
 	   }
         res = Executor::concolicFork(current, condition, isInternal);
-        if (s2eState->m_replaying) { //回放只是用来选择状态用的
+        if (s2eState->m_replaying && !s2eState->m_preparingstate) { //回放只是用来选择状态用的
 			if (res.first && res.second) {
 				if (currentce) {
 					res.second->m_shouldbedeleted = true;
@@ -2244,9 +2218,7 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
     }
     return res;
 }
-void S2EExecutor::notifyBranchPub(ExecutionState &state){
-	notifyBranch(state);
-}
+
 /**
  * Called from klee::Executor when the engine is about to fork
  * the current state.

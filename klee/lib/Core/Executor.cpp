@@ -136,6 +136,10 @@ namespace {
   cl::opt<bool>
   DebugCheckForImpliedValues("debug-check-for-implied-values");
 
+  cl::opt<bool>
+  DebugspeculativeCondition("debug-speculative-condition",
+                         cl::desc("Print speculativeCondition query to std::out."),
+                         cl::init(false));
 
   cl::opt<bool>
   SimplifySymIndices("simplify-sym-indices",
@@ -917,6 +921,16 @@ bool Executor::checkSpeculativeState(ExecutionState &state)
     Query query(state.constraints,state.speculativeCondition);
     bool truth;
     bool res = solver->solver->mustBeTrue(query.negateExpr(), truth);
+    if(DebugspeculativeCondition){
+    	try{
+    		std::cout << "res:" << (res?"true":"false") << "  truth:" << (truth?"true":"false") << "\n";
+			for(typeof(state.constraints.begin()) it =state.constraints.begin(), itend = state.constraints.end(); it != itend;  ++ it) {
+				std::cout << "Constraint: " << std::hex << *it << '\n';
+			}
+			std::cout  << "speculativeCondition" <<  state.speculativeCondition->getstring() << "\n";
+    	}catch (...) {
+		}
+	}
     if (!res || truth) {
        return false;
     }

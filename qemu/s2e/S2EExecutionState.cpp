@@ -118,6 +118,8 @@ S2EExecutionState::S2EExecutionState(klee::KFunction *kf) :
     m_replaying=false;
     m_allowserialize = true;
     m_forcetoadd = false;
+    m_preparingstate = false;
+
 }
 
 S2EExecutionState::~S2EExecutionState()
@@ -306,50 +308,7 @@ void S2EExecutionState::clearTlbOwnership()
     }
 #endif
 }
-S2EExecutionState* S2EExecutionState::getCopy(){
-	   // When cloning, all ObjectState becomes not owned by neither of states
-	    // This means that we must clean owned-by-us flag in S2E TLB
-	    assert(m_active && m_cpuSystemState);
-	    clearTlbOwnership();
-	    S2EExecutionState *ret = new S2EExecutionState(*this);
-	    ret->addressSpace.state = ret;
-	    ret->m_deviceState.setExecutionState(ret);
-	    ret->m_statefilename="";
 
-	    if(m_lastS2ETb)
-	        m_lastS2ETb->refCount += 1;
-
-	    ret->m_stateID = m_stateID;
-
-	    ret->m_timersState = new TimersState;
-	    *ret->m_timersState = *m_timersState;
-
-	    // Clone the plugins
-	    PluginStateMap::iterator it;
-	    ret->m_PluginState.clear();
-	    for(it = m_PluginState.begin(); it != m_PluginState.end(); ++it) {
-	        ret->m_PluginState.insert(std::make_pair((*it).first, (*it).second->clone()));
-	    }
-
-	    // This objects are not in TLB and won't cause any changes to it
-	    ret->m_cpuRegistersObject = ret->addressSpace.getWriteable(
-	                            m_cpuRegistersState, m_cpuRegistersObject);
-	    ret->m_cpuSystemObject = ret->addressSpace.getWriteable(
-	                            m_cpuSystemState, m_cpuSystemObject);
-
-	    m_cpuRegistersObject = addressSpace.getWriteable(
-	                            m_cpuRegistersState, m_cpuRegistersObject);
-	    m_cpuSystemObject = addressSpace.getWriteable(
-	                            m_cpuSystemState, m_cpuSystemObject);
-
-	    ret->m_dirtyMaskObject = ret->addressSpace.getWriteable(
-	            m_dirtyMask, m_dirtyMaskObject);
-
-	    m_dirtyMaskObject = addressSpace.getWriteable(
-	            m_dirtyMask, m_dirtyMaskObject);
-
-	    return ret;
-}
 ExecutionState* S2EExecutionState::clone(bool cestatus)
 {
     // When cloning, all ObjectState becomes not owned by neither of states
@@ -367,17 +326,20 @@ ExecutionState* S2EExecutionState::clone(bool cestatus)
         m_lastS2ETb->refCount += 1;
 
     ret->m_replaying = this->m_replaying;
-    if(this->m_replaying){//回放的状态始终在自己身上
-	ret->m_forkrecord=std::deque<bool>(this->m_forkrecord);
-	ret->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord4repaly);
+    if(!m_preparingstate){
+		if(this->m_replaying){//回放的状态始终在自己身上
+		ret->m_forkrecord=std::deque<bool>(this->m_forkrecord);
+		ret->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord4repaly);
 
-  }else{
-	this->m_forkrecord.push_back(cestatus);
-	this->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord);
+	  }else{
+		this->m_forkrecord.push_back(cestatus);
+		this->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord);
 
-	ret->m_forkrecord.push_back(!cestatus);
-	ret->m_forkrecord4repaly=std::deque<bool>(ret->m_forkrecord);
-  }
+		ret->m_forkrecord.push_back(!cestatus);
+		ret->m_forkrecord4repaly=std::deque<bool>(ret->m_forkrecord);
+	  }
+    }
+
     ret->m_stateID = g_s2e->fetchAndIncrementStateId();
 
     ret->m_timersState = new TimersState;

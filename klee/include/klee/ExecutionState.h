@@ -68,6 +68,7 @@ class ExecutionState {
   //cherry start
 public:
   bool m_shouldbedeleted; // cherry while in replay mode,this is used as  mark for delete.
+  bool  m_is_carry_on_state;
   typedef std::pair<ConstraintManager,ref<Expr> > CEPair;
   CEPair m_symbolicaddress;
   //cherry end

@@ -143,7 +143,6 @@ public:
     }
     /** Create initial execution state */
     S2EExecutionState* createInitialState();
-    S2EExecutionState* createInitialState4Deserialize();
     /** Called from QEMU before entering main loop */
     void initializeExecution(S2EExecutionState *initialState,
                              bool executeAlwaysKlee);
@@ -251,7 +250,6 @@ public:
         return yieldedState;
     }
 public:
-    void notifyBranchPub(klee::ExecutionState &state); //cherry
     bool isStateExist(klee::ExecutionState* state){
     	if (states.find(state) != states.end()) {
 			return true;

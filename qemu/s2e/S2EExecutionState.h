@@ -115,6 +115,7 @@ public:
 	 std::deque<bool> m_forkrecord;
 	 std::deque<bool> m_forkrecord4repaly;
     //是否正在重播，当m_forkrecord4repaly变为空时，请将其设为false
+    bool m_preparingstate;
     bool m_replaying;
     bool m_allowserialize;
     bool m_forcetoadd;
@@ -216,7 +217,7 @@ public:
     enum AddressType {
         VirtualAddress, PhysicalAddress, HostAddress
     };
-    S2EExecutionState* getCopy();
+
     S2EExecutionState(klee::KFunction *kf);
     ~S2EExecutionState();
 
