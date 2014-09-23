@@ -762,6 +762,7 @@ void Executor::branch(ExecutionState &state,
   for (unsigned i=1; i<N; ++i) {
     ExecutionState *es = result[theRNG.getInt32() % i];
     ExecutionState *ns = es->branch();
+    if(!ns) fprintf(stderr, "insert null state. why?...\n");
     addedStates.insert(ns);
     result.push_back(ns);
     es->ptreeNode->data = 0;
@@ -884,6 +885,7 @@ Executor::concolicFork(ExecutionState &current, ref<Expr> condition, bool isInte
 
     ExecutionState *trueState, *falseState, *branchedState;
     branchedState = current.branch(ce->isTrue());
+    if(!branchedState) fprintf(stderr, "insert null state. why?...\n");
     addedStates.insert(branchedState);
 
     branchedState->speculative = true;
@@ -1133,6 +1135,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
     notifyBranch(*trueState);
     falseState = trueState->branch();
+    if(!falseState) fprintf(stderr, "insert null state. why?...\n");
     addedStates.insert(falseState);
 
     if (RandomizeFork && theRNG.getBool())
@@ -2639,6 +2642,9 @@ void Executor::updateStates(ExecutionState *current) {
     deleteState(es);
   }
   removedStates.clear();
+ if (searcher) {
+    searcher->afterupdate(current);
+  }
 }
 
 void Executor::bindInstructionConstants(KInstruction *KI) {

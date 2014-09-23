@@ -79,6 +79,7 @@ ExecutionState::ExecutionState(KFunction *kf)
   pushFrame(0, kf);
   //不能放到上面，因为this本身还未初始化，那么this->constraints就是个未知数，用于构造pair时导致size无穷大出错。
   m_symbolicaddress = std::make_pair(this->constraints,klee::ConstantExpr::create(0, klee::Expr::Int32));
+  m_concreteAddressEvaluate = (uint64_t) -1;
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions) 
@@ -92,6 +93,7 @@ ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
     speculative(false) {
 	//不能放到上面，因为this本身还未初始化，那么this->constraints就是个未知数，用于构造pair时导致size无穷大出错。
 	m_symbolicaddress = std::make_pair(this->constraints,klee::ConstantExpr::create(0, klee::Expr::Int32));
+	m_concreteAddressEvaluate = (uint64_t) -1;
 }
 
 ExecutionState::~ExecutionState() {

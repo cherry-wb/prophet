@@ -301,6 +301,8 @@ public:
 
   int searchMemory(lua_State *L);
 	int dumpInfo(lua_State *L);
+	int setCheckDataMemoryAccess(lua_State *L);
+	int setStepDebug(lua_State *L);
 	int searchFirstSymMemory(lua_State *L);
 
 	int setExecuteStartAndEnd(lua_State *L);

@@ -419,6 +419,8 @@ Lunar<S2ELUAExecutionState>::RegType S2ELUAExecutionState::methods[] = {
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, isRunningConcrete),  //cherry
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, isSymbolicExecutionEnabled), //cherry
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getSp),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getPc),  //cherry
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getPid),  //cherry
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getDisasm),  //cherry
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getFileName),  //cherry
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, searchMemory),
@@ -427,6 +429,8 @@ Lunar<S2ELUAExecutionState>::RegType S2ELUAExecutionState::methods[] = {
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setExecuteStartAndEnd),
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getTranslateStartAndEnd),
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, getExecuteStartAndEnd),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setCheckDataMemoryAccess),
+  LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setStepDebug),
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, searchFirstSymMemory),
   LUNAR_DECLARE_METHOD(S2ELUAExecutionState, setMainProcess),
 
@@ -919,6 +923,32 @@ int S2ELUAExecutionState::searchMemory(lua_State *L) {
 	}
 	return 1;
 }
+int S2ELUAExecutionState::setCheckDataMemoryAccess(lua_State *L){
+	uint32_t check = luaL_checkint(L, 1);
+	try{
+		if(check>0){
+			g_s2e->setCheckDataMemoryAccess(true);
+		}else{
+			g_s2e->setCheckDataMemoryAccess(false);
+		}
+	}catch(...){
+		return -1;
+	}
+	return 0;
+}
+int S2ELUAExecutionState::setStepDebug(lua_State *L){
+	uint32_t check = luaL_checkint(L, 1);
+	try{
+		if(check>0){
+			g_s2e->setStepDebug(true);
+		}else{
+			g_s2e->setStepDebug(false);
+		}
+	}catch(...){
+		return -1;
+	}
+	return 0;
+}
 int S2ELUAExecutionState::searchFirstSymMemory(lua_State *L) {
 	uint32_t startaddress = luaL_checkint(L, 1);
 	uint32_t endaddress = luaL_checkint(L, 2);
@@ -968,6 +998,14 @@ int S2ELUAExecutionState::isRunningConcrete(lua_State *L) {
 }
 int S2ELUAExecutionState::isSymbolicExecutionEnabled(lua_State *L) {
 	lua_pushboolean(L, m_state->isSymbolicExecutionEnabled()); /* first result */
+	return 1;
+}
+int S2ELUAExecutionState::getPc(lua_State *L) {
+	lua_pushnumber(L, m_state->getPc()); /* first result */
+	return 1;
+}
+int S2ELUAExecutionState::getPid(lua_State *L) {
+	lua_pushnumber(L, m_state->getPid()); /* first result */
 	return 1;
 }
 int S2ELUAExecutionState::getSp(lua_State *L) {

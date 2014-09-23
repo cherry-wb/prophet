@@ -125,6 +125,7 @@ protected:
    uint64_t m_ExecuteWatchStart;
    uint64_t m_TranslateWatchEnd;
    uint64_t m_ExecuteWatchEnd;
+	bool m_checkDataMemoryAccess;
 
    bool m_plugininied;
 
@@ -300,6 +301,23 @@ public:
     		m_TranslateWatchEnd = translateWatchEnd;
     	}
 
+    	bool isCheckDataMemoryAccess() const {
+    		return m_checkDataMemoryAccess;
+    	}
+
+    	void setCheckDataMemoryAccess(bool checkDataMemoryAccess) {
+    		m_checkDataMemoryAccess = checkDataMemoryAccess;
+    	}
+
+    	bool m_stepDebug;
+
+    	bool isStepDebug() const {
+    		return m_stepDebug;
+    	}
+
+    	void setStepDebug(bool stepDebug) {
+    		m_stepDebug = stepDebug;
+    	}
 };
 
 } // namespace s2e

@@ -318,7 +318,7 @@ ExecutionState* S2EExecutionState::clone(bool cestatus)
     S2EExecutionState *ret = new S2EExecutionState(*this);
     ret->addressSpace.state = ret;
     ret->m_deviceState.setExecutionState(ret);
-    ret->m_statefilename="";
+    ret->m_statefilename=std::string(this->m_statefilename);
 	ret->m_allowserialize = true;
 	ret->m_shouldbedeleted = false;
 
@@ -330,13 +330,24 @@ ExecutionState* S2EExecutionState::clone(bool cestatus)
 		if(this->m_replaying){//回放的状态始终在自己身上
 		ret->m_forkrecord=std::deque<bool>(this->m_forkrecord);
 		ret->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord4repaly);
+		ret-> m_forkPoints=std::deque<uint64_t>(this->m_forkPoints);
+		ret->m_concreteAddress=std::deque<uint64_t>(this->m_concreteAddress);
+		ret->m_concreteAddress4repaly=std::deque<uint64_t>(this->m_concreteAddress4repaly);
 
 	  }else{
-		this->m_forkrecord.push_back(cestatus);
-		this->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord);
+		  if(this->m_concreteAddressEvaluate != ((uint64_t) -1)){
 
-		ret->m_forkrecord.push_back(!cestatus);
-		ret->m_forkrecord4repaly=std::deque<bool>(ret->m_forkrecord);
+		  }else{
+				this->m_forkrecord.push_back(cestatus);
+				this->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord);
+				this->m_forkPoints.push_back(getPc());
+				//this->m_concreteAddress.push_back(this->m_concreteAddressEvaluate);
+
+				ret->m_forkrecord.push_back(!cestatus);
+				ret->m_forkrecord4repaly=std::deque<bool>(ret->m_forkrecord);
+				ret-> m_forkPoints.push_back(getPc());
+				//ret->m_concreteAddress.push_back(this->m_concreteAddressEvaluate);
+		  }
 	  }
     }
 

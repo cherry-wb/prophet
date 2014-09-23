@@ -40,7 +40,8 @@ namespace klee {
     virtual void update(ExecutionState *current,
                         const std::set<ExecutionState*> &addedStates,
                         const std::set<ExecutionState*> &removedStates) = 0;
-
+    // let searcher do more special select stratage
+    virtual void afterupdate(ExecutionState *current){} ;
     virtual bool empty() = 0;
 
     // prints name of searcher as a klee_message()

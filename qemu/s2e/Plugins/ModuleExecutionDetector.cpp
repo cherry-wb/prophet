@@ -343,7 +343,7 @@ void ModuleExecutionDetector::moduleLoadListener(
 			std::stringstream ss;
 			ss << "ModuleExecutionDetector mainmodule：" << m_mainmodule << "PID:"
 					<< hexval(m_mainmoduleIndentity);
-			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"onmainmoduleload",ss.str());
+			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"mainmoduleload",ss.str());
 
 		} else if (s && m_mainmoduleIndentity == 0 && m_mainmodule != *s) {
 			return; //主模块加载之前不要加载任何其他附加模块
@@ -356,7 +356,7 @@ void ModuleExecutionDetector::moduleLoadListener(
 			std::stringstream ss;
 			ss << "ModuleExecutionDetector mainmodule:" << m_mainmodule << "LoadBase:"
 					<< hexval(m_mainmoduleIndentity);
-			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"onmainmoduleload",ss.str());
+			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"mainmoduleload",ss.str());
 		}
 	}
 

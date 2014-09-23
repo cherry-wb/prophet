@@ -114,6 +114,9 @@ public:
 	 std::deque<bool> m_forkdecision;
 	 std::deque<bool> m_forkrecord;
 	 std::deque<bool> m_forkrecord4repaly;
+	 std::deque<uint64_t> m_forkPoints;
+	 std::deque<uint64_t> m_concreteAddress;
+	 std::deque<uint64_t> m_concreteAddress4repaly;
     //是否正在重播，当m_forkrecord4repaly变为空时，请将其设为false
     bool m_preparingstate;
     bool m_replaying;
@@ -226,7 +229,9 @@ public:
     S2EDeviceState *getDeviceState() {
         return &m_deviceState;
     }
-
+	static void resetLastSymbolicId(){
+		s_lastSymbolicId = 0;
+	}
     TranslationBlock *getTb() const;
 
     uint64_t getTotalInstructionCount();

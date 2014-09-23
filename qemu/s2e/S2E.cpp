@@ -345,6 +345,8 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
     m_currentProcessIndex = 0;
     m_currentProcessId = 0;
     m_plugininied = false;
+    m_checkDataMemoryAccess = true;
+    m_stepDebug = false;
     m_TranslateWatchStart = (uint64_t)-1;
     m_ExecuteWatchStart =  (uint64_t)-1;
     m_TranslateWatchEnd = (uint64_t)-1;
@@ -512,6 +514,8 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
 	    m_ExecuteWatchStart =m_configFile->getInt("pluginsConfig.executeWatchStart",(uint64_t)-1);
 	    m_TranslateWatchEnd =m_configFile->getInt("pluginsConfig.translateWatchEnd",(uint64_t)-1);
 	    m_ExecuteWatchEnd =m_configFile->getInt("pluginsConfig.executeWatchEnd",(uint64_t)-1);
+	    m_checkDataMemoryAccess = m_configFile->getBool("pluginsConfig.checkDataMemoryAccess",true);
+	    m_stepDebug= m_configFile->getBool("pluginsConfig.stepDebug",false);
 	    if(m_node_id.length()>0){
 			outputfolderid = m_node_id;
 		}

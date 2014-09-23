@@ -71,6 +71,7 @@ public:
   bool  m_is_carry_on_state;
   typedef std::pair<ConstraintManager,ref<Expr> > CEPair;
   CEPair m_symbolicaddress;
+  uint64_t m_concreteAddressEvaluate;
   //cherry end
 public:
   typedef std::vector<StackFrame> stack_ty;

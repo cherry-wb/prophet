@@ -99,7 +99,7 @@ void s2e_tcg_execution_handler(void* signal, uint64_t pc)
 {
     try {
         ExecutionSignal *s = (ExecutionSignal*)signal;
-        if((pc >= g_s2e->getExecuteWatchStart()&&pc <= g_s2e->getExecuteWatchEnd())){
+        if(g_s2e->m_stepDebug || (pc >= g_s2e->getExecuteWatchStart()&&pc <= g_s2e->getExecuteWatchEnd())){
 				std::stringstream message;
 				message << "executing pc :" << hexval(pc) << "\n";
 				message << "basic info dump.\n";

@@ -257,6 +257,9 @@ public:
 			return false;
 		}
     }
+
+	void setParalForkOnSymbolicAddress(bool paralForkOnSymbolicAddress);
+
 protected:
     static void handlerTraceMemoryAccess(klee::Executor* executor,
                                     klee::ExecutionState* state,

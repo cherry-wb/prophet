@@ -187,6 +187,11 @@ namespace {
             cl::init(true));
 
     cl::opt<bool>
+    ParalForkOnSymbolicAddress("paral-fork-on-symbolic-address",
+            cl::desc("Fork on each memory access with symbolic address with parallel extention"),
+            cl::init(false));
+
+    cl::opt<bool>
     ConcretizeIoAddress("concretize-io-address",
             cl::desc("Concretize symbolic I/O addresses"),
             cl::init(true));
@@ -263,6 +268,7 @@ extern cl::opt<bool> UseExprSimplifier;
 
 extern "C" {
     int g_s2e_fork_on_symbolic_address = 0;
+    int g_s2e_paral_fork_on_symbolic_address = 0;
     int g_s2e_concretize_io_addresses = 1;
     int g_s2e_concretize_io_writes = 1;
 
@@ -569,20 +575,94 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
     klee::ref<klee::Expr> condition = EqExpr::create(concreteAddress, address);
 
     if (!state->forkDisabled) {
-        //XXX: may create deep paths!
-        StatePair sp = executor->fork(*state, condition, true);
+    	if(g_s2e_paral_fork_on_symbolic_address){
+    		   S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    		if(s2eState->m_replaying){
+					s2eState->m_forkrecord4repaly.pop_front();
+    			   uint64_t addressAsign= 	s2eState->m_concreteAddress4repaly.front();
+					s2eState->m_concreteAddress4repaly.pop_front();
+    			   concreteAddress = klee::ConstantExpr::create(addressAsign, address->getWidth());
+    			   condition = EqExpr::create(concreteAddress, address);
+    			   state->addConstraint(condition);
+    				if (s2eState->m_forkrecord4repaly.size() == 0) {
+    					s2eState->m_replaying = false;
+    					s2eState->m_forkrecord4repaly = std::deque<bool>(
+    							s2eState->m_forkrecord);
 
-        //The condition is always true in the current state
-        //(i.e., expr == concreteAddress holds).
-        assert(sp.first == state);
+    					s2eState->m_allowserialize = true;
+					}
+    				if (s2eState->m_concreteAddress4repaly.size() == 0) {
+    					s2eState->m_concreteAddress4repaly = std::deque<uint64_t>(
+    					    					    							s2eState->m_concreteAddress);
+    				}
+    		}else{
+				std::pair<klee::ref<klee::Expr>, klee::ref<klee::Expr> > res = s2eExecutor->getSolver()->getRange(
+										klee::Query(state->constraints, address));
+				uint64_t start = cast < klee::ConstantExpr
+						> (res.first)->getZExtValue();
+				uint64_t end = cast < klee::ConstantExpr > (res.second)->getZExtValue();
+				uint64_t currentAddress =  cast< klee::ConstantExpr> (concreteAddress)->getZExtValue();
+				//fprintf(stderr, "start fork symbolic address...\n");
+				for(uint64_t next = start; next <= end ; next ++){
+					if(currentAddress == next) continue;
+				     klee::ref<klee::Expr>  nextconcreteAddress = klee::ConstantExpr::create(next, address->getWidth());
+					 klee::ref<klee::Expr> conditionnext = EqExpr::create(nextconcreteAddress, address);
+					 klee::ref<klee::Expr> conditionnextnot =  klee::NotExpr::create(conditionnext);
+					klee::Query query(state->constraints,conditionnext);
+				    bool truth;
+				    bool res = s2eExecutor->getSolver()->mustBeTrue(query, truth);
+				    if (!res || truth) {
+				       continue;
+				    }
+					state->m_concreteAddressEvaluate =  currentAddress;
+					StatePair sp = executor->fork(*state, conditionnextnot, true);
+					state->m_concreteAddressEvaluate = (uint64_t) -1;
+					assert(sp.first == state);
 
-        //It may happen that the simplifier figures out that
-        //the condition is always true, in which case, no fork is needed.
-        //TODO: find a test case for that
-        if (sp.second) {
-            //Will have to reexecute handleForkAndConcretize in the speculative state
-            sp.second->pc = sp.second->prevPC;
-        }
+					if (sp.second) {
+						S2EExecutionState* nexts2eState = static_cast<S2EExecutionState*>(sp.second);
+
+//						foreach2(it, nexts2eState->constraints.begin(), nexts2eState->constraints.end()) {
+//					    	std::cout << "Constraint: " << std::hex << *it << '\n';
+//						}
+//					    std::cout << "Condition: "  <<  conditionnext->getstring();
+
+						//nexts2eState->addConstraint(conditionnext);
+						nexts2eState->m_forkrecord.push_back(false);
+						nexts2eState->m_forkrecord4repaly=std::deque<bool>(nexts2eState->m_forkrecord);
+						nexts2eState->m_forkPoints.push_back(nexts2eState->getPc());
+
+						 nexts2eState->m_concreteAddress.push_back(next);
+						 nexts2eState->m_concreteAddress4repaly=std::deque<uint64_t>(nexts2eState->m_concreteAddress);
+						 s2eExecutor->bindLocal(target, *nexts2eState, nextconcreteAddress);
+					}
+				}
+				//fprintf(stderr, "end fork symbolic address...\n");
+				s2eState->m_forkrecord.push_back(true);
+				s2eState->m_forkrecord4repaly=std::deque<bool>(s2eState->m_forkrecord);
+				s2eState->m_forkPoints.push_back(s2eState->getPc());
+
+				s2eState->addConstraint(condition);
+				s2eState->m_concreteAddress.push_back(currentAddress);
+				s2eState->m_concreteAddress4repaly=std::deque<uint64_t>(s2eState->m_concreteAddress);
+    		}
+    	}else{
+    		//XXX: may create deep paths!
+			state->m_concreteAddressEvaluate =  cast< klee::ConstantExpr> (concreteAddress)->getZExtValue();
+			StatePair sp = executor->fork(*state, condition, true);
+			state->m_concreteAddressEvaluate = (uint64_t) -1;
+			//The condition is always true in the current state
+			//(i.e., expr == concreteAddress holds).
+			assert(sp.first == state);
+
+			//It may happen that the simplifier figures out that
+			//the condition is always true, in which case, no fork is needed.
+			//TODO: find a test case for that
+			if (sp.second) {
+				//Will have to reexecute handleForkAndConcretize in the speculative state
+				sp.second->pc = sp.second->prevPC;
+			}
+    	}
     } else {
         state->addConstraint(condition);
     }
@@ -917,7 +997,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     g_s2e_fork_on_symbolic_address = ForkOnSymbolicAddress;
     g_s2e_concretize_io_addresses = ConcretizeIoAddress;
     g_s2e_concretize_io_writes = ConcretizeIoWrites;
-
+    g_s2e_paral_fork_on_symbolic_address = ParalForkOnSymbolicAddress;
     if(TaintMode){
     	ConcolicMode = TaintMode;
     }
@@ -932,6 +1012,9 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
         }
     }
 
+}
+void S2EExecutor::setParalForkOnSymbolicAddress(bool paralForkOnSymbolicAddress) {
+	g_s2e_paral_fork_on_symbolic_address = paralForkOnSymbolicAddress;
 }
 
 void S2EExecutor::initializeStatistics()
@@ -2167,31 +2250,39 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
         res = Executor::concolicFork(current, condition, isInternal);
         if (s2eState->m_replaying && !s2eState->m_preparingstate) { //回放只是用来选择状态用的
 			if (res.first && res.second) {
-				if (currentce) {
-					res.second->m_shouldbedeleted = true;
-				}
-				if (!currentce) {
-					res.first->m_shouldbedeleted = true;
-				}
 				if (res.second) {
 					S2EExecutionState* s2esecond =
 							static_cast<S2EExecutionState*>(res.second);
 					if (s2esecond->m_forkrecord4repaly.size() == 0) {
-						s2esecond->m_replaying = false;
 						s2esecond->m_forkrecord4repaly = std::deque<bool>(
 								s2esecond->m_forkrecord);
 						s2esecond->m_allowserialize = false;
+						if (currentce) {
+							s2esecond->m_replaying = true;
+						}else{
+							s2esecond->m_replaying = false;
+						}
 					}
 				}
 				if (res.first) {
 					S2EExecutionState* s2efirst =
 							static_cast<S2EExecutionState*>(res.first);
 					if (s2efirst->m_forkrecord4repaly.size() == 0) {
-						s2efirst->m_replaying = false;
+						if (!currentce) {
+							s2efirst->m_replaying = true;
+						}else{
+							s2efirst->m_replaying = false;
+						}
 						s2efirst->m_forkrecord4repaly = std::deque<bool>(
 								s2efirst->m_forkrecord);
 						s2efirst->m_allowserialize = false;
 					}
+				}
+				if (currentce) {
+					res.second->m_shouldbedeleted = true;
+				}
+				if (!currentce) {
+					res.first->m_shouldbedeleted = true;
 				}
 			}
 		}
