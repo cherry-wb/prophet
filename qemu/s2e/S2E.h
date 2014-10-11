@@ -118,6 +118,7 @@ protected:
     llvm::raw_ostream*   m_warningStream;
 
     std::stringstream m_cmdline;
+    std::string m_snap_short_name;
     std::string m_node_type;
 
    std::string m_node_id;
@@ -260,7 +261,9 @@ public:
     const std::stringstream& getCmdline() const {
     		return m_cmdline;
     	}
-
+       const std::string& getSnapShortName() const {
+    		return m_snap_short_name;
+    	}
     	const std::string& getNodeType() const {
     		return m_node_type;
     	}

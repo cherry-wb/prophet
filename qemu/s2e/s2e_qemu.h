@@ -360,6 +360,7 @@ void tcg_llvm_trace_port_access(uint64_t port, uint64_t value,
                                 unsigned bits, int isWrite);
 void tcg_llvm_make_symbolic(void *addr, unsigned nbytes, const char *name);
 void tcg_llvm_get_value(void *addr, unsigned nbytes, bool addConstraint);
+void tcg_llvm_div_check(uint64_t divide);
 //#endif
 
 

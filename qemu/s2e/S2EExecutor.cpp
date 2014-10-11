@@ -261,8 +261,9 @@ cl::opt<bool>
 DebugConstraints("debug-constraints",
                cl::desc("Check that added constraints are satisfiable"),  cl::init(false));
 
-
-
+cl::opt<bool>
+ForceCheckDivZero("force-check-div-zero",
+               cl::desc("check divide by zero. "),  cl::init(false));
 
 extern cl::opt<bool> UseExprSimplifier;
 
@@ -718,6 +719,73 @@ void S2EExecutor::handleEipCorrupt(Executor* executor,
     }
 }
 
+void S2EExecutor::handleDivCheck(Executor* executor,
+                                   ExecutionState* state,
+                                   klee::KInstruction* target,
+                                   std::vector< ref<Expr> > &args)
+{
+	if(!ForceCheckDivZero) return;
+    S2EExecutor* s2eExecutor = static_cast<S2EExecutor*>(executor);
+    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    assert(args.size() == 1);
+    ref<Expr> divedvalue = args[0];
+    if (!isa<klee::ConstantExpr>(divedvalue)) {
+    	//fork
+    	divedvalue = state->constraints.simplifyExpr(divedvalue);
+
+		if (UseExprSimplifier) {
+			divedvalue = s2eExecutor->simplifyExpr(*state, divedvalue);
+		}
+
+		if(isa<klee::ConstantExpr>(divedvalue)) {
+			s2eExecutor->bindLocal(target, *state, divedvalue);
+			return;
+		}
+		klee::ref<klee::Expr> concreteValue;
+
+		if (ConcolicMode) {
+			concreteValue = state->concolics.evaluate(divedvalue);
+			assert(dyn_cast<klee::ConstantExpr>(concreteValue) && "Could not evaluate address");
+		} else {
+			klee::ref<klee::ConstantExpr> value;
+			bool success = s2eExecutor->getSolver()->getValue(
+					Query(state->constraints, divedvalue), value);
+
+			if (!success) {
+				s2eExecutor->terminateStateEarly(*state, "Could not compute a concrete value for a symbolic divider");
+				assert(false && "Can't get here");
+			}
+
+			concreteValue = value;
+		}
+
+		klee::ref<klee::Expr> condition = EqExpr::create(concreteValue, divedvalue);
+
+		if (!state->forkDisabled) {
+			uint64_t thisvalue = cast<klee::ConstantExpr>(concreteValue)->getZExtValue(64);
+			if(thisvalue == 0) return;
+		    g_s2e->getMessagesStream(s2eState) << "DivCheck at pc = " << hexval(s2eState->getPc()) << "\n";
+			klee::ref<klee::Expr>  nextconcreteValue = klee::ConstantExpr::create(0, divedvalue->getWidth());
+			 klee::ref<klee::Expr> conditionnext = EqExpr::create(nextconcreteValue, divedvalue);
+			 klee::ref<klee::Expr> conditionnextnot =  klee::NotExpr::create(conditionnext);
+			klee::Query query(state->constraints,conditionnext);
+			bool truth;
+			bool res = s2eExecutor->getSolver()->mustBeTrue(query, truth);
+			if (!res || truth) {
+			   return;
+			}
+			StatePair sp = executor->fork(*state, conditionnextnot, true);
+			//The condition is always true in the current state
+			//(i.e., expr == concreteValue holds).
+			assert(sp.first == state);
+
+		} else {
+			state->addConstraint(condition);
+		}
+
+		s2eExecutor->bindLocal(target, *state, concreteValue);
+    }
+}
 S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
                     const InterpreterOptions &opts,
                             InterpreterHandler *ie)
@@ -974,6 +1042,15 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
                 "tcg_llvm_eip_corrupt", eipCorruptTy));
         assert(function);
         addSpecialFunctionHandler(function, handleEipCorrupt);
+
+         vector<llvm::Type*> paramsdiv;
+        paramsdiv.push_back(IntegerType::get(M->getContext(), 64));
+        FunctionType *divcheckTy = FunctionType::get(
+                llvm::Type::getVoidTy(M->getContext()), paramsdiv, false);
+        function = dynamic_cast<Function*>(kmodule->module->getOrInsertFunction(
+                "tcg_llvm_div_check", divcheckTy));
+        assert(function);
+        addSpecialFunctionHandler(function, handleDivCheck);
 
         FunctionType *traceInstTy = FunctionType::get(llvm::Type::getVoidTy(M->getContext()), false);
         function = dynamic_cast<Function*>(kmodule->module->getOrInsertFunction("tcg_llvm_trace_instruction", traceInstTy));
@@ -2865,7 +2942,6 @@ void helper_register_symbol(const char *name, void *address)
     llvm::sys::DynamicLibrary::AddSymbol(name, address);
 }
 void s2e_dump_testcase(S2E *s2e,S2EExecutionState *state) {
-	//TODO 只能检测一个异常？
 	std::stringstream err;
 	err << "StateID:" << state->getID()	 << "div-zero:BUG:检测到除0漏洞."<< std::endl;
 	s2e->getCorePlugin()->onVulnFound.emit(state,"div-zero",err.str());

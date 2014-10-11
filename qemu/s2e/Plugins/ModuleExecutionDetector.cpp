@@ -349,6 +349,8 @@ void ModuleExecutionDetector::moduleLoadListener(
 			return; //主模块加载之前不要加载任何其他附加模块
 		} else if (m_mainmoduleIndentity != 0 && module.Pid != m_mainmoduleIndentity) {
 			return; //不是作为主进程附加模块而加载的，则略过
+		}else if (m_mainmoduleIndentity == 0){
+			return;
 		}
 	}else{
 		if (s && m_mainmoduleIndentity == 0 && m_mainmodule == *s) {

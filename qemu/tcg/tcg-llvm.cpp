@@ -135,6 +135,7 @@ struct TCGLLVMContextPrivate {
     Function *m_helperMakeSymbolic;
     Function *m_helperGetValue;
     Function *m_helperEipCorrupt;
+    Function *m_helperDivCheck;
     Function* m_qemu_ld_helpers[5];
     Function* m_qemu_st_helpers[5];
 #endif
@@ -218,6 +219,20 @@ public:
 #endif
     }
 
+    Value* handleDivCheck(Value *orig) {
+#ifdef CONFIG_S2E
+        if (isa<ConstantInt>(orig)) {
+            return orig;
+        }
+
+        m_builder.CreateCall(m_helperDivCheck,
+                             m_builder.CreateZExt(orig, intType(64)));
+
+        return orig;
+#else
+        return orig;
+#endif
+    }
     void adjustTypeSize(unsigned target, Value **v1, Value **v2) {
         adjustTypeSize(target, v1);
         adjustTypeSize(target, v2);
@@ -425,6 +440,9 @@ void TCGLLVMContextPrivate::initializeHelpers()
 
     m_helperEipCorrupt =
             m_module->getFunction("tcg_llvm_eip_corrupt");
+
+    m_helperDivCheck =
+            m_module->getFunction("tcg_llvm_div_check");
 
     m_qemu_ld_helpers[0] = m_module->getFunction("__ldb_mmu");
     m_qemu_ld_helpers[1] = m_module->getFunction("__ldw_mmu");
@@ -754,6 +772,8 @@ void TCGLLVMContextPrivate::generateTraceCall(uintptr_t pc)
 int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
 {
     Value *v;
+    Value *vdiv1;
+    Value *vdiv2;
     TCGOpDef &def = tcg_op_defs[opc];
     int nb_args = def.nb_args;
 
@@ -1058,8 +1078,19 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
         setValue(args[0], m_builder.Create ## op(v1, v2));          \
     } break;
 
+#define __ARITH_OP_DIV_CHECK(opc_name, op, bits)                              \
+    case opc_name: {                                                \
+        Value *v1 = getValue(args[1]);                              \
+        Value *v2 = getValue(args[2]);                              \
+        adjustTypeSize(bits, &v1, &v2);                             \
+        assert(v1->getType() == intType(bits));                     \
+        assert(v2->getType() == intType(bits));                     \
+        v2 = handleDivCheck(v2);                                              \
+        setValue(args[0], m_builder.Create ## op(v1, v2));          \
+    } break;
+
 #define __ARITH_OP_DIV2(opc_name, signE, bits)                      \
-    case opc_name:                                                  \
+    case opc_name:{                                                  \
         assert(getValue(args[2])->getType() == intType(bits));      \
         assert(getValue(args[3])->getType() == intType(bits));      \
         assert(getValue(args[4])->getType() == intType(bits));      \
@@ -1069,23 +1100,23 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
                 m_builder.CreateZExt(                               \
                     ConstantInt::get(intType(bits), bits),          \
                     intType(bits*2)));                              \
+		vdiv1 = m_builder.CreateZExt(                        \
+                getValue(args[4]), intType(bits*2));                \
+		vdiv1 = handleDivCheck(vdiv1);                                              \
+		vdiv2 = m_builder.CreateZExt(                        \
+				getValue(args[4]), intType(bits*2));                \
         v = m_builder.CreateOr(v,                                   \
                 m_builder.CreateZExt(                               \
                     getValue(args[2]), intType(bits*2)));           \
         setValue(args[0], m_builder.CreateTrunc(                    \
                 m_builder.Create ## signE ## Div(                   \
-                    v, m_builder.CreateZExt(                        \
-                        getValue(args[4]), intType(bits*2))         \
-                    ),                                              \
+                    v, vdiv1),                                                                          \
                     intType(bits)));                                \
         setValue(args[1], m_builder.CreateTrunc(                    \
                 m_builder.Create ## signE ## Rem(                   \
-                    v, m_builder.CreateZExt(                        \
-                        getValue(args[4]), intType(bits*2))         \
-                    ),                                              \
+                    v, vdiv2 ),                                                                            \
                 intType(bits)));                                    \
-
-        break;
+                }break;
 
 #define __ARITH_OP_ROT(opc_name, op1, op2, bits)                    \
     case opc_name:                                                  \
@@ -1126,8 +1157,8 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
     __ARITH_OP(INDEX_op_mul_i32, Mul, 32)
 
 #if TCG_TARGET_HAS_div_i32
-    __ARITH_OP(INDEX_op_div_i32,  SDiv, 32)
-    __ARITH_OP(INDEX_op_divu_i32, UDiv, 32)
+    __ARITH_OP_DIV_CHECK(INDEX_op_div_i32,  SDiv, 32)
+    __ARITH_OP_DIV_CHECK(INDEX_op_divu_i32, UDiv, 32)
     __ARITH_OP(INDEX_op_rem_i32,  SRem, 32)
     __ARITH_OP(INDEX_op_remu_i32, URem, 32)
 #else
@@ -1158,8 +1189,8 @@ int TCGLLVMContextPrivate::generateOperation(int opc, const TCGArg *args)
     __ARITH_OP(INDEX_op_mul_i64, Mul, 64)
 
 #if TCG_TARGET_HAS_div_i64
-    __ARITH_OP(INDEX_op_div_i64,  SDiv, 64)
-    __ARITH_OP(INDEX_op_divu_i64, UDiv, 64)
+    __ARITH_OP_DIV_CHECK(INDEX_op_div_i64,  SDiv, 64)
+    __ARITH_OP_DIV_CHECK(INDEX_op_divu_i64, UDiv, 64)
     __ARITH_OP(INDEX_op_rem_i64,  SRem, 64)
     __ARITH_OP(INDEX_op_remu_i64, URem, 64)
 #else

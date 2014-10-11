@@ -685,7 +685,11 @@ static inline void gen_jmp_im(DisasContext *s, target_ulong pc)
     }
     #endif
 }
-
+static inline void gen_jmp_im_div(DisasContext *s, target_ulong pc)
+{
+    tcg_gen_movi_tl(cpu_tmp0, pc);
+    tcg_gen_st_tl(cpu_tmp0, cpu_env, offsetof(CPUX86State, eip));
+}
 static inline void gen_string_movl_A0_ESI(DisasContext *s)
 {
     int override;
@@ -4676,21 +4680,21 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         case 6: /* div */
             switch(ot) {
             case OT_BYTE:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_divb_AL(cpu_T[0]);
                 break;
             case OT_WORD:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_divw_AX(cpu_T[0]);
                 break;
             default:
             case OT_LONG:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_divl_EAX(cpu_T[0]);
                 break;
 #ifdef TARGET_X86_64
             case OT_QUAD:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_divq_EAX(cpu_T[0]);
                 break;
 #endif
@@ -4699,21 +4703,21 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         case 7: /* idiv */
             switch(ot) {
             case OT_BYTE:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_idivb_AL(cpu_T[0]);
                 break;
             case OT_WORD:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_idivw_AX(cpu_T[0]);
                 break;
             default:
             case OT_LONG:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_idivl_EAX(cpu_T[0]);
                 break;
 #ifdef TARGET_X86_64
             case OT_QUAD:
-                gen_jmp_im(s, pc_start - s->cs_base);
+                gen_jmp_im_div(s, pc_start - s->cs_base);
                 gen_helper_idivq_EAX(cpu_T[0]);
                 break;
 #endif

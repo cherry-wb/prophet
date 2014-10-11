@@ -394,6 +394,9 @@ S2E::S2E(int argc, char** argv, TCGLLVMContext *tcgLLVMContext,
 			}else if(arg.find(std::string("gnome-terminal"))!= std::string::npos){
 				++i;
 			}else{
+				if(arg.find(std::string("-loadvm"))!= std::string::npos){
+					m_snap_short_name = argv[i+1];
+				}
 				(*out) << "'" << argv[i] << "'";
 				 m_cmdline << "'" << argv[i] << "'";
 			}

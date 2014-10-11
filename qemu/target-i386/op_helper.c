@@ -1802,7 +1802,6 @@ static void QEMU_NORETURN raise_exception(int exception_index)
 #ifdef CONFIG_S2E
     if (EXCP00_DIVZ == exception_index)
     {
-     s2e_debug_print("Exception: div 0!");
      s2e_dump_testcase(g_s2e, g_s2e_state);
     }
 #endif
@@ -2103,6 +2102,13 @@ void helper_divb_AL(target_ulong t0)
 
     num = (EAX & 0xffff);
     den = (t0 & 0xff);
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    //we may not need this , cause this file is complie to llvm ir, and will be executed symboliclly.
+    //and the condition  if (den == 0)  will do the forking, but we just keep this to demo how to add check method.
+    tcg_llvm_div_check(den);
+#endif
+#endif
     if (den == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -2120,6 +2126,11 @@ void helper_idivb_AL(target_ulong t0)
 
     num = (int16_t)EAX;
     den = (int8_t)t0;
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(den);
+#endif
+#endif
     if (den == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -2137,6 +2148,11 @@ void helper_divw_AX(target_ulong t0)
 
     num = (EAX & 0xffff) | ((EDX & 0xffff) << 16);
     den = (t0 & 0xffff);
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(den);
+#endif
+#endif
     if (den == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -2155,6 +2171,11 @@ void helper_idivw_AX(target_ulong t0)
 
     num = (EAX & 0xffff) | ((EDX & 0xffff) << 16);
     den = (int16_t)t0;
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(den);
+#endif
+#endif
     if (den == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -2174,6 +2195,11 @@ void helper_divl_EAX(target_ulong t0)
 
     num = ((uint32_t)EAX) | ((uint64_t)((uint32_t)EDX) << 32);
     den = t0;
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(den);
+#endif
+#endif
     if (den == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -2192,6 +2218,11 @@ void helper_idivl_EAX(target_ulong t0)
 
     num = ((uint32_t)EAX) | ((uint64_t)((uint32_t)EDX) << 32);
     den = t0;
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(den);
+#endif
+#endif
     if (den == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -5185,6 +5216,11 @@ target_ulong helper_imulq_T0_T1(target_ulong t0, target_ulong t1)
 void helper_divq_EAX(target_ulong t0)
 {
     uint64_t r0, r1;
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(t0);
+#endif
+#endif
     if (t0 == 0) {
         raise_exception(EXCP00_DIVZ);
     }
@@ -5199,6 +5235,11 @@ void helper_divq_EAX(target_ulong t0)
 void helper_idivq_EAX(target_ulong t0)
 {
     uint64_t r0, r1;
+#ifdef CONFIG_S2E
+#ifdef S2E_LLVM_LIB
+    tcg_llvm_div_check(t0);
+#endif
+#endif
     if (t0 == 0) {
         raise_exception(EXCP00_DIVZ);
     }
