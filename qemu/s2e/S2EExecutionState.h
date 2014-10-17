@@ -192,6 +192,8 @@ protected:
 
     bool m_needFinalizeTBExec;
 
+    bool m_forkAborted;
+
     unsigned m_nextSymbVarId;
 
     S2EStateStats m_stats;

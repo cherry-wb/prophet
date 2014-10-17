@@ -974,6 +974,13 @@ bool Executor::resolveSpeculativeState(ExecutionState &state)
 }
 
 
+void Executor::notifyFork(ExecutionState &originalState, ref<Expr> &condition,
+                          Executor::StatePair &targets)
+{
+    //Should not get here
+    assert(false && "Must go through S2E");
+}
+
 Executor::StatePair 
 Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   condition = simplifyExpr(current, condition);
@@ -1772,6 +1779,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         transferToBasicBlock(bi->getSuccessor(0), bi->getParent(), *branches.first);
       if (branches.second)
         transferToBasicBlock(bi->getSuccessor(1), bi->getParent(), *branches.second);
+
+      notifyFork(state, cond, branches);
     }
     break;
   }
@@ -1939,7 +1948,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
         bool success = solver->getValue(*free, v, value);
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
-        StatePair res = fork(*free, EqExpr::create(v, value), true);
+        ref<Expr> cond = EqExpr::create(v, value);
+        StatePair res = fork(*free, cond, true);
+        notifyFork(*free, cond, res);
         if (res.first) {
           uint64_t addr = value->getZExtValue();
           if (legalFunctions.count(addr)) {
@@ -3235,8 +3246,10 @@ void Executor::executeAlloc(ExecutionState &state,
       example = tmp;
     }
 
-    StatePair fixedSize = fork(state, EqExpr::create(example, size), true);
-    
+    ref<Expr> cond = EqExpr::create(example, size);
+    StatePair fixedSize = fork(state, cond, true);
+    notifyFork(state, cond, fixedSize);
+
     if (fixedSize.second) { 
       // Check for exactly two values
       ref<ConstantExpr> tmp;
@@ -3288,7 +3301,9 @@ void Executor::executeAlloc(ExecutionState &state,
 void Executor::executeFree(ExecutionState &state,
                            ref<Expr> address,
                            KInstruction *target) {
-  StatePair zeroPointer = fork(state, Expr::createIsZero(address), true);
+  ref<Expr> cond = Expr::createIsZero(address);
+  StatePair zeroPointer = fork(state, cond, true);
+
   if (zeroPointer.first) {
     if (target)
       bindLocal(target, *zeroPointer.first, Expr::createPointer(0));
@@ -3317,6 +3332,9 @@ void Executor::executeFree(ExecutionState &state,
       }
     }
   }
+
+
+  notifyFork(state, cond, zeroPointer);
 }
 
 void Executor::resolveExact(ExecutionState &state,
@@ -3334,6 +3352,7 @@ void Executor::resolveExact(ExecutionState &state,
     ref<Expr> inBounds = EqExpr::create(p, it->first->getBaseExpr());
     
     StatePair branches = fork(*unbound, inBounds, true);
+    notifyFork(*unbound, inBounds, branches);
     
     if (branches.first)
       results.push_back(std::make_pair(*it, branches.first));
@@ -3400,6 +3419,9 @@ void Executor::executeMemoryOperation(ExecutionState &state,
             //The forked state will have to re-execute the memory op
             branches.second->pc = branches.second->prevPC;
           }
+
+          notifyFork(state, condition, branches);
+
       } else {
           solver->setTimeout(stpTimeout);
           if (!state.addressSpace.resolveOne(state, solver, address, op, success)) {
@@ -3546,6 +3568,8 @@ void Executor::executeMemoryOperation(ExecutionState &state,
         bindLocal(target, *bound, result);
       }
     }
+
+    notifyFork(state, inBounds, branches);
 
     unbound = branches.second;
     if (!unbound)
