@@ -144,6 +144,13 @@ public:
             uint64_t /* static target pc */>
             onModuleTranslateBlockEnd;
 
+ sigc::signal<void,
+            S2EExecutionState*,
+            const ModuleDescriptor &,
+            TranslationBlock*,
+            uint64_t /* ending instruction pc */
+            >
+ onModuleTranslateBlockOver;
     /** This filters module loads passed by OSInterceptor */
     sigc::signal<void,
        S2EExecutionState*,
@@ -181,9 +188,12 @@ private:
         uint64_t endPc,
         bool staticTarget,
         uint64_t targetPc);
-
+  void onTranslateBlockOver(
+        S2EExecutionState* state,
+        TranslationBlock *tb,
+        uint64_t endPc
+       );
     void onExecution(S2EExecutionState *state, uint64_t pc);
-
     void exceptionListener(
         S2EExecutionState* state,
         unsigned intNb,
@@ -213,6 +223,7 @@ public:
     //bool toExecutionDesc(ModuleExecutionDesc *desc, const ModuleDescriptor *md);
     const ModuleDescriptor *getModule(S2EExecutionState *state, uint64_t pc, bool tracked=true);
     const ModuleDescriptor *getCurrentDescriptor(S2EExecutionState* state) const;
+    const ModuleDescriptor *getDescriptor(S2EExecutionState* state, uint64_t pid, uint64_t pc) const;
     const std::string *getModuleId(const ModuleDescriptor &desc) const;
 
     void dumpMemory(S2EExecutionState *state,

@@ -168,7 +168,7 @@ enum ETranslationBlockType
     TB_DEFAULT=0,
     TB_JMP, TB_JMP_IND,
     TB_COND_JMP, TB_COND_JMP_IND,
-    TB_CALL, TB_CALL_IND, TB_REP, TB_RET
+    TB_CALL, TB_CALL_IND, TB_REP, TB_RET, TB_INT_2B
 };
 
 #ifdef CONFIG_S2E
@@ -356,7 +356,7 @@ TranslationBlock *tb_find_pc(uintptr_t pc_ptr);
 extern spinlock_t tb_lock;
 
 extern int tb_invalidated_flag;
-
+extern int tb_need_flash;
 /* The return address may point to the start of the next instruction.
    Subtracting one gets us the call instruction itself.  */
 #if defined(CONFIG_TCG_INTERPRETER)

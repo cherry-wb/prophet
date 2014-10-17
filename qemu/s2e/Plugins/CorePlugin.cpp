@@ -282,6 +282,19 @@ void s2e_on_translate_block_end(
     }
 }
 
+void s2e_on_translate_block_over(
+        S2E* s2e, S2EExecutionState *state,
+        TranslationBlock *tb,
+        uint64_t insPc)
+{
+    assert(state->isActive());
+
+    try {
+        s2e->getCorePlugin()->onTranslateBlockOver.emit(state, tb, insPc);
+    } catch(s2e::CpuExitException&) {
+        s2e_longjmp(env->jmp_env, 1);
+    }
+}
 void s2e_on_translate_instruction_start(
         S2E* s2e, S2EExecutionState* state,
         TranslationBlock *tb, uint64_t pc)

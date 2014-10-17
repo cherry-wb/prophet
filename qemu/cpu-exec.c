@@ -49,7 +49,7 @@ int generate_llvm = 0;
 int execute_llvm = 0;
 
 int tb_invalidated_flag;
-
+int tb_need_flash = 0;
 //#define CONFIG_DEBUG_EXEC
 
 bool qemu_cpu_has_work(CPUArchState *env)

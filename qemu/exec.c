@@ -1117,13 +1117,14 @@ TranslationBlock *tb_gen_code(CPUArchState *env,
 
     phys_pc = get_page_addr_code(env, pc);
     tb = tb_alloc(pc);
-    if (!tb) {
+    if (!tb || tb_need_flash) {
         /* flush must be done */
         tb_flush(env);
         /* cannot fail at this point */
         tb = tb_alloc(pc);
         /* Don't forget to invalidate previous TB info.  */
         tb_invalidated_flag = 1;
+        tb_need_flash = 0;
     }
     tc_ptr = code_gen_ptr;
     tb->tc_ptr = tc_ptr;

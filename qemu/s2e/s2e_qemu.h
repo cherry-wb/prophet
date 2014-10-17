@@ -116,7 +116,10 @@ void s2e_on_translate_block_end(
         struct S2EExecutionState *state, 
         struct TranslationBlock *tb, uint64_t insPc,
         int staticTarget, uint64_t targetPc);
-
+void s2e_on_translate_block_over(
+        struct S2E* s2e,
+        struct S2EExecutionState *state,
+        struct TranslationBlock *tb, uint64_t insPc);
 
 /** Called by cpu_gen_code() before translation of each instruction */
 void s2e_on_translate_instruction_start(

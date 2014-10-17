@@ -352,7 +352,7 @@ void WindowsMonitor::onPageDirectoryChange(S2EExecutionState *state, uint64_t pr
 
 void WindowsMonitor::slotUmCatchModuleLoad(S2EExecutionState *state, uint64_t pc)
 {
-    s2e()->getDebugStream(state) << "User mode module load at " << hexval(pc) << '\n';
+   //s2e()->getDebugStream(state) << "User mode module load at " << hexval(pc) << '\n';
     m_UserModeInterceptor->CatchModuleLoad(state);
 }
 
@@ -790,7 +790,9 @@ uint64_t WindowsMonitor::getDirectoryTableBase(S2EExecutionState *state, uint64_
         if (!state->readMemoryConcrete(pProcessEntry, &ProcessEntry, sizeof(ProcessEntry))) {
             return 0;
         }
-
+        char d[32];
+		sprintf(d,"%s",ProcessEntry.ImageFileName);
+		g_s2e->getDebugStream() << "Found PgDir=0x" <<  hexval(ProcessEntry.Pcb.DirectoryTableBase) << " imageName=" << d<< "\n";
         return ProcessEntry.Pcb.DirectoryTableBase;
     }else {
         s2e::windows::EPROCESS32_XP ProcessEntry;
@@ -798,7 +800,9 @@ uint64_t WindowsMonitor::getDirectoryTableBase(S2EExecutionState *state, uint64_
         if (!state->readMemoryConcrete(pProcessEntry, &ProcessEntry, sizeof(ProcessEntry))) {
             return 0;
         }
-
+        char d[32];
+		sprintf(d,"%s",ProcessEntry.ImageFileName);
+        g_s2e->getDebugStream() << "Found PgDir=0x" <<  hexval(ProcessEntry.Pcb.DirectoryTableBase) << " imageName=" << d<< "\n";
         return ProcessEntry.Pcb.DirectoryTableBase;
     }
 }

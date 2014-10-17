@@ -603,7 +603,8 @@ void tcg_register_helper_with_reg_mask(void *func, const char *name,
 
 void tcg_register_helper(void *func, const char *name)
 {
-    tcg_register_helper_with_reg_mask(func, name, (uint64_t) -1, (uint64_t) -1, 1);
+    //tcg_register_helper_with_reg_mask(func, name, (uint64_t) -1, (uint64_t) -1, 1);
+    tcg_register_helper_with_reg_mask(func, name,  (uint64_t) -1, 0, 1);//this will be better.
 }
 
 /* Note: we convert the 64 bit args to 32 bit and do some alignment

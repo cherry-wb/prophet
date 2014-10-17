@@ -6867,6 +6867,9 @@ static target_ulong disas_insn(DisasContext *s, target_ulong pc_start)
         break;
     case 0xcd: /* int N */
         val = ldub_code(s->pc++);
+        if(val == 0x2b){
+        	 SET_TB_TYPE(TB_INT_2B);
+        }
         if (s->vm86 && s->iopl != 3) {
             gen_exception(s, EXCP0D_GPF, pc_start - s->cs_base);
         } else {
@@ -8118,6 +8121,10 @@ static inline void gen_intermediate_code_internal(CPUX86State *env,
 
     if (!search_pc) {
         tb->size = pc_ptr - pc_start;
+#ifdef CONFIG_S2E
+      	s2e_on_translate_block_over(g_s2e, g_s2e_state,
+                    tb, dc->insPc);
+#endif
         tb->icount = num_insns;
     }
 }

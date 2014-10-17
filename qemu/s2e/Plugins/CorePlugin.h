@@ -139,7 +139,12 @@ public:
             uint64_t /* static target pc */>
             onTranslateBlockEnd;
 
-    
+     sigc::signal<void,  S2EExecutionState*,
+            TranslationBlock*,
+            uint64_t /* ending instruction pc */
+           >
+     onTranslateBlockOver;
+
     /** Signal that is emitted on code generation for each instruction */
     sigc::signal<void, ExecutionSignal*,
             S2EExecutionState*,

@@ -106,6 +106,9 @@ void ModuleExecutionDetector::initialize()
     s2e()->getCorePlugin()->onTranslateBlockEnd.connect(
             sigc::mem_fun(*this, &ModuleExecutionDetector::onTranslateBlockEnd));
 
+    s2e()->getCorePlugin()->onTranslateBlockOver.connect(
+            sigc::mem_fun(*this, &ModuleExecutionDetector::onTranslateBlockOver));
+
     s2e()->getCorePlugin()->onException.connect(
         sigc::mem_fun(*this, &ModuleExecutionDetector::exceptionListener));
 
@@ -135,9 +138,9 @@ void ModuleExecutionDetector::initializeConfiguration()
 
     m_TrackAllModules = cfg->getBool(getConfigKey() + ".trackAllModules");
     m_ConfigureAllModules = cfg->getBool(getConfigKey() + ".configureAllModules");
-
+    //m_checkPacker = cfg->getBool(getConfigKey() + ".checkPacker",false);
     foreach2(it, keyList.begin(), keyList.end()) {
-        if (*it == "trackAllModules"  || *it == "configureAllModules" || *it == "mainmodule") {
+        if (*it == "trackAllModules"  || *it == "configureAllModules" || *it == "mainmodule"|| *it == "checkPacker") {
             continue;
         }
 
@@ -344,7 +347,7 @@ void ModuleExecutionDetector::moduleLoadListener(
 			ss << "ModuleExecutionDetector mainmodule：" << m_mainmodule << "PID:"
 					<< hexval(m_mainmoduleIndentity);
 			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"mainmoduleload",ss.str());
-
+			tb_need_flash = 1;
 		} else if (s && m_mainmoduleIndentity == 0 && m_mainmodule != *s) {
 			return; //主模块加载之前不要加载任何其他附加模块
 		} else if (m_mainmoduleIndentity != 0 && module.Pid != m_mainmoduleIndentity) {
@@ -526,12 +529,24 @@ void ModuleExecutionDetector::onTranslateBlockStart(
         				&& pc <= s2e()->getTranslateWatchEnd()) {
 			std::stringstream ss;
 			ss << "start to translate basicblock. start：" << hexval(tb->pc) << "  size："<<hexval(tb->size) <<"\n";
+			s2e()->getDebugStream() << ss.str() ;
 			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"translateblockstart",ss.str());
 		}
         onModuleTranslateBlockStart.emit(signal, state, *currentModule, tb, pc);
     }
+//    else if(m_mainmoduleIndentity!=0  && m_mainmoduleIndentity == m_Monitor->getPid(state, state->getPc())){
+//    	ModuleDescriptor _tmpmd;
+//		_tmpmd.Name = "unknown";
+//    	onModuleTranslateBlockStart.emit(signal, state, _tmpmd, tb, pc);
+//	  if (pc >= s2e()->getTranslateWatchStart()
+//							&& pc <= s2e()->getTranslateWatchEnd()) {
+//				std::stringstream ss;
+//				ss << "start to translate basicblock. start：" << hexval(tb->pc) << "  size："<<hexval(tb->size) <<"\n";
+//				s2e()->getDebugStream() << ss.str() ;
+//				s2e()->getCorePlugin()->onNotifyMessage.emit(state,"translateblockstart",ss.str());
+//			}
+//    }
 }
-
 
 void ModuleExecutionDetector::onTranslateBlockEnd(
         ExecutionSignal *signal,
@@ -557,7 +572,7 @@ void ModuleExecutionDetector::onTranslateBlockEnd(
         const ModuleDescriptor *targetModule =
             plgState->getDescriptor(m_Monitor->getPid(state, targetPc), targetPc);
 
-        if (targetModule != currentModule) {
+        if (currentModule && targetModule != currentModule) {
             //Only instrument in case there is a module change
             //TRACE("Static transition from %#"PRIx64" to %#"PRIx64"\n",
             //    endPc, targetPc);
@@ -568,16 +583,48 @@ void ModuleExecutionDetector::onTranslateBlockEnd(
         //        endPc, targetPc);
         //In case of dynamic targets, conservatively
         //instrument code.
-    	connectExecution(currentModule, targetPc, signal);
+    	 if (currentModule)
+    	{
+    		 connectExecution(currentModule, targetPc, signal);
+    	}
     }
 
     if (currentModule) {
        onModuleTranslateBlockEnd.emit(signal, state, *currentModule, tb, endPc,
         staticTarget, targetPc);
     }
+//    else if(m_mainmoduleIndentity!=0 && m_mainmoduleIndentity == m_Monitor->getPid(state, state->getPc())){
+//    	ModuleDescriptor _tmpmd;
+//    	_tmpmd.Name = "unknown";
+//        onModuleTranslateBlockEnd.emit(signal, state, _tmpmd, tb, endPc,
+//         staticTarget, targetPc);
+//    }
 
 }
+void ModuleExecutionDetector::onTranslateBlockOver(
+        S2EExecutionState* state,
+        TranslationBlock *tb,
+        uint64_t endPc)
+{
+    const ModuleDescriptor *currentModule =
+            getCurrentDescriptor(state);
 
+    if (!currentModule) {
+        // Outside of any module, do not need
+        // to instrument tb exits.
+        return;
+    }
+
+    if (currentModule) {
+    	onModuleTranslateBlockOver.emit(state, *currentModule, tb, endPc);
+    }
+//    else if(m_mainmoduleIndentity!=0 && m_mainmoduleIndentity == m_Monitor->getPid(state, state->getPc())){
+//    	ModuleDescriptor _tmpmd;
+//    	_tmpmd.Name = "unknown";
+//    	onModuleTranslateBlockOver.emit(state, _tmpmd, tb, endPc);
+//    }
+
+}
 void ModuleExecutionDetector::exceptionListener(
                        S2EExecutionState* state,
                        unsigned intNb,
@@ -610,7 +657,11 @@ const ModuleDescriptor *ModuleExecutionDetector::getCurrentDescriptor(S2EExecuti
 
     return plgState->getDescriptor(pid, pc);
 }
-
+const ModuleDescriptor *ModuleExecutionDetector::getDescriptor(S2EExecutionState* state, uint64_t pid, uint64_t pc) const
+{
+    DECLARE_PLUGINSTATE_CONST(ModuleTransitionState, state);
+    return plgState->getDescriptor(pid, pc);
+}
 void ModuleExecutionDetector::onExecution(
     S2EExecutionState *state, uint64_t pc)
 {
