@@ -77,7 +77,7 @@ private:
   uint64_t m_LdrAddr; 
   uint64_t m_ProcBase;
   
-  ModuleDescriptor::MDSet m_LoadedLibraries;
+//  ModuleDescriptor::MDSet m_LoadedLibraries;
 
   //IDataStructureSpy::Processes m_ProcList;
 

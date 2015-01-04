@@ -521,6 +521,8 @@ void S2E::initOutputDirectory(const string& outputDirectory, int verbose, bool f
 	    m_stepDebug= m_configFile->getBool("pluginsConfig.stepDebug",false);
 	    if(m_node_id.length()>0){
 			outputfolderid = m_node_id;
+		}else{
+			m_node_id = outputfolderid;
 		}
     if (!forked) {
         //In case we create the first S2E process

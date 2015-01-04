@@ -119,6 +119,8 @@ S2EExecutionState::S2EExecutionState(klee::KFunction *kf) :
     m_timersState = new TimersState;
     m_dirtyMaskObject = NULL;
     m_replaying=false;
+    m_isskip = false;
+    m_replay2normal = false;
     m_allowserialize = true;
     m_forcetoadd = false;
     m_preparingstate = false;
@@ -318,37 +320,58 @@ ExecutionState* S2EExecutionState::clone(bool cestatus)
     // This means that we must clean owned-by-us flag in S2E TLB
     assert(m_active && m_cpuSystemState);
     clearTlbOwnership();
+    //一定是分化时才会到这里?
+    bool currentce = false;
+	if (this->m_replaying && !this->m_preparingstate && (this->m_concreteAddressEvaluate == ((uint64_t) -1))) { //回放只是用来选择状态用的
+		currentce = this->m_forkrecord4repaly.front();
+		this->m_forkrecord4repaly.pop_front();
+	}
+
     S2EExecutionState *ret = new S2EExecutionState(*this);
     ret->addressSpace.state = ret;
     ret->m_deviceState.setExecutionState(ret);
     ret->m_statefilename=std::string(this->m_statefilename);
 	ret->m_allowserialize = true;
 	ret->m_shouldbedeleted = false;
+	ret->m_isskip = false;
 
     if(m_lastS2ETb)
         m_lastS2ETb->refCount += 1;
 
     ret->m_replaying = this->m_replaying;
+    ret->m_replay2normal = this->m_replay2normal;
     if(!m_preparingstate){
 		if(this->m_replaying){//回放的状态始终在自己身上
 		ret->m_forkrecord=std::deque<bool>(this->m_forkrecord);
 		ret->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord4repaly);
-		ret-> m_forkPoints=std::deque<uint64_t>(this->m_forkPoints);
+		//ret-> m_forkPoints=std::deque<uint64_t>(this->m_forkPoints);
 		ret->m_concreteAddress=std::deque<uint64_t>(this->m_concreteAddress);
 		ret->m_concreteAddress4repaly=std::deque<uint64_t>(this->m_concreteAddress4repaly);
 
+			this->m_forkrecord.push_back(cestatus);
+			ret->m_forkrecord.push_back(!cestatus);
+
+			this->m_forkPoints.push_back(getPc());
+			ret-> m_forkPoints=std::deque<uint64_t>(this->m_forkPoints);
+
 	  }else{
 		  if(this->m_concreteAddressEvaluate != ((uint64_t) -1)){
-
+				ret->m_forkrecord=std::deque<bool>(this->m_forkrecord);
+				ret->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord4repaly);
+				ret->m_concreteAddress=std::deque<uint64_t>(this->m_concreteAddress);
+				ret->m_concreteAddress4repaly=std::deque<uint64_t>(this->m_concreteAddress4repaly);
+				ret-> m_forkPoints=std::deque<uint64_t>(this->m_forkPoints);
 		  }else{
+				ret->m_forkrecord = std::deque<bool>(this->m_forkrecord);
+
 				this->m_forkrecord.push_back(cestatus);
-				this->m_forkrecord4repaly=std::deque<bool>(this->m_forkrecord);
+				this->m_forkrecord4repaly = std::deque<bool>(this->m_forkrecord);
 				this->m_forkPoints.push_back(getPc());
 				//this->m_concreteAddress.push_back(this->m_concreteAddressEvaluate);
-
 				ret->m_forkrecord.push_back(!cestatus);
 				ret->m_forkrecord4repaly=std::deque<bool>(ret->m_forkrecord);
-				ret-> m_forkPoints.push_back(getPc());
+
+				ret-> m_forkPoints=std::deque<uint64_t>(this->m_forkPoints);
 				//ret->m_concreteAddress.push_back(this->m_concreteAddressEvaluate);
 		  }
 	  }
@@ -358,6 +381,43 @@ ExecutionState* S2EExecutionState::clone(bool cestatus)
 
     ret->m_timersState = new TimersState;
     *ret->m_timersState = *m_timersState;
+
+    //fprintf(stderr, "fork r:%c p:%c c:%c v:%c\n",(this->m_replaying?'y':'n'),(this->m_preparingstate?'y':'n'),(this->m_concreteAddressEvaluate?'y':'n'),(cestatus?'y':'n'));
+    //
+    if (this->m_replaying && !this->m_preparingstate  && (this->m_concreteAddressEvaluate == ((uint64_t) -1))) { //回放只是用来选择状态用的
+			S2EExecutionState* s2esecond = cestatus ? ret : this;
+			if (s2esecond->m_forkrecord4repaly.size() == 0) {
+				s2esecond->m_forkrecord4repaly = std::deque<bool>(
+						s2esecond->m_forkrecord);
+				s2esecond->m_allowserialize = false;
+				if (currentce) {
+					s2esecond->m_replaying = true;
+				}else{
+					s2esecond->m_replaying = false;
+					s2esecond->m_replay2normal = true;
+				}
+			}
+			S2EExecutionState* s2efirst =  cestatus ? this : ret;
+			if (s2efirst->m_forkrecord4repaly.size() == 0) {
+				s2efirst->m_forkrecord4repaly = std::deque<bool>(
+						s2efirst->m_forkrecord);
+				s2efirst->m_allowserialize = false;
+				if (!currentce) {
+					s2efirst->m_replaying = true;
+				}else{
+					s2efirst->m_replaying = false;
+					s2efirst->m_replay2normal = true;
+				}
+			}
+		if (currentce) {
+			s2esecond->m_shouldbedeleted = true;
+			s2esecond->m_isskip = true;
+		}
+		if (!currentce) {
+			s2efirst->m_shouldbedeleted = true;
+			s2efirst->m_isskip = true;
+		}
+   		}
 
     // Clone the plugins
     PluginStateMap::iterator it;

@@ -114,6 +114,8 @@ struct ModuleExecutionDesc {
 typedef std::set<ModuleExecutionCfg, ModuleExecCfgById> ConfiguredModulesById;
 typedef std::set<ModuleExecutionCfg, ModuleExecCfgByName> ConfiguredModulesByName;
 
+class ModuleTransitionState;
+
 class ModuleExecutionDetector:public Plugin
 {
     S2E_PLUGIN
@@ -163,7 +165,6 @@ private:
     ConfiguredModulesById m_ConfiguredModulesId;
     ConfiguredModulesByName m_ConfiguredModulesName;
     std::string m_mainmodule;
-    uint64_t  m_mainmoduleIndentity;
 
     bool m_TrackAllModules;
     bool m_ConfigureAllModules;
@@ -241,9 +242,6 @@ public:
         bool goahead(
     			S2EExecutionState *state, uint64_t pc,bool isDataMemoryAccess = false);
 
-    	uint64_t getMainmoduleIndentity() const {
-    		return m_mainmoduleIndentity;
-    	}
     	bool isKernelMode(){
     		if(m_Monitor){
     			return m_Monitor->isKernelMode();
@@ -255,10 +253,8 @@ public:
     	const std::string& getMainmodule() const {
     		return m_mainmodule;
     	}
-
-    	void setMainmoduleIndentity(uint64_t mainmoduleIndentity) {
-    		m_mainmoduleIndentity = mainmoduleIndentity;
-    	}
+    	uint64_t getMainmoduleIndentity(S2EExecutionState *state) const ;
+    	void setMainmoduleIndentity(uint64_t mainmoduleIndentity,S2EExecutionState *state) ;
     friend class ModuleTransitionState;
 };
 
@@ -273,6 +269,7 @@ private:
 
     DescriptorSet m_Descriptors;
     DescriptorSet m_NotTrackedDescriptors;
+    uint64_t  m_mainmoduleIndentity;
 
     const ModuleDescriptor *getDescriptor(uint64_t pid, uint64_t pc, bool tracked=true) const;
     bool loadDescriptor(const ModuleDescriptor &desc, bool track);

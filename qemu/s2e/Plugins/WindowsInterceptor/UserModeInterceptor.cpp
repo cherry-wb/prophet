@@ -160,11 +160,12 @@ bool WindowsUmInterceptor::FindModules(S2EExecutionState *state)
         Desc.LoadBase = LdrEntry.DllBase;
         Desc.Size = LdrEntry.SizeOfImage;
 
+        WindowsMonitorState *plgState = static_cast<WindowsMonitorState*>(m_Os->getPluginState(state, &WindowsMonitorState::factory));
         //XXX: this must be state-local
-        if (m_LoadedLibraries.find(Desc) == m_LoadedLibraries.end()) {
+        if (plgState->m_LoadedLibraries.find(Desc) == plgState->m_LoadedLibraries.end()) {
             s2e_debug_print("  MODULE %s Base=%#x Size=%#x\n", s.c_str(), LdrEntry.DllBase, LdrEntry.SizeOfImage);
             NotifyModuleLoad(state, Desc);
-            m_LoadedLibraries.insert(Desc);
+            plgState->m_LoadedLibraries.insert(Desc);
         }
 
         CurLib = CONTAINING_RECORD32(LdrEntry.InLoadOrderLinks.Flink,

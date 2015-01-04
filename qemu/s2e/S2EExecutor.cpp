@@ -552,7 +552,7 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
 
     klee::ref<klee::Expr> concreteAddress;
 
-    if (ConcolicMode) {
+    if (ConcolicMode) {//ConcolicMode = TaintMode
     	  //为了获取符号化的地址，我们将这里的address保存到当前的state中，以便于出现内存访问或其他需要的时候拿到未具体化的符号地址用于分析。
 		state->m_symbolicaddress = make_pair(state->constraints, address);
         concreteAddress = state->concolics.evaluate(address);
@@ -576,17 +576,22 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
     klee::ref<klee::Expr> condition = EqExpr::create(concreteAddress, address);
 
     if (!state->forkDisabled) {
+    	S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
     	if(g_s2e_paral_fork_on_symbolic_address){
-    		   S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
     		if(s2eState->m_replaying){
+    				bool currentce = s2eState->m_forkrecord4repaly.front();
+    				s2eState->m_forkrecord.push_back(currentce);
 					s2eState->m_forkrecord4repaly.pop_front();
     			   uint64_t addressAsign= 	s2eState->m_concreteAddress4repaly.front();
 					s2eState->m_concreteAddress4repaly.pop_front();
     			   concreteAddress = klee::ConstantExpr::create(addressAsign, address->getWidth());
     			   condition = EqExpr::create(concreteAddress, address);
     			   state->addConstraint(condition);
+
+    			   s2eState->m_forkPoints.push_back(s2eState->getPc());
     				if (s2eState->m_forkrecord4repaly.size() == 0) {
     					s2eState->m_replaying = false;
+    					s2eState->m_replay2normal = true;
     					s2eState->m_forkrecord4repaly = std::deque<bool>(
     							s2eState->m_forkrecord);
 
@@ -1081,7 +1086,7 @@ S2EExecutor::S2EExecutor(S2E* s2e, TCGLLVMContext *tcgLLVMContext,
     	ConcolicMode = TaintMode;
     }
     concolicMode = ConcolicMode;
-
+    taintMode = TaintMode;
     if (UseFastHelpers) {
         if (!ForkOnSymbolicAddress) {
             s2e->getWarningsStream()
@@ -2315,7 +2320,7 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 
     StatePair res;
 
-	if (TaintMode) {
+	if (taintMode) {
 		condition = simplifyExpr(current, condition);
 		ref<Expr> selectcondition;
 		S2EExecutionState* s2ecurrent =
@@ -2340,6 +2345,12 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 				addConstraint(current, selectcondition);
 				res = StatePair(0, &current);
 			}
+			//record forkPoints
+			S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(&current);
+			s2eState->m_forkrecord.push_back(ce->isTrue());
+			s2eState->m_forkrecord4repaly=std::deque<bool>(s2eState->m_forkrecord);
+			s2eState->m_forkPoints.push_back(s2eState->getPc());
+
 			if (VerboseFork) {
 				llvm::raw_ostream& out = m_s2e->getMessagesStream(s2ecurrent);
 				out << "May Fork state " << s2ecurrent->getID() << " at pc = "
@@ -2350,53 +2361,7 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 		   m_s2e->getCorePlugin()->onTaintFork.emit(s2ecurrent, selectcondition);
 		}
    } else if (ConcolicMode) {
-	   bool currentce = false;
-	   S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(&current);
-	   if (!isa<klee::ConstantExpr>(condition)) {
-		   if (s2eState->m_replaying && !s2eState->m_preparingstate) { //回放只是用来选择状态用的
-				currentce = s2eState->m_forkrecord4repaly.front();
-				s2eState->m_forkrecord4repaly.pop_front();
-			}
-	   }
         res = Executor::concolicFork(current, condition, isInternal);
-        if (s2eState->m_replaying && !s2eState->m_preparingstate) { //回放只是用来选择状态用的
-			if (res.first && res.second) {
-				if (res.second) {
-					S2EExecutionState* s2esecond =
-							static_cast<S2EExecutionState*>(res.second);
-					if (s2esecond->m_forkrecord4repaly.size() == 0) {
-						s2esecond->m_forkrecord4repaly = std::deque<bool>(
-								s2esecond->m_forkrecord);
-						s2esecond->m_allowserialize = false;
-						if (currentce) {
-							s2esecond->m_replaying = true;
-						}else{
-							s2esecond->m_replaying = false;
-						}
-					}
-				}
-				if (res.first) {
-					S2EExecutionState* s2efirst =
-							static_cast<S2EExecutionState*>(res.first);
-					if (s2efirst->m_forkrecord4repaly.size() == 0) {
-						if (!currentce) {
-							s2efirst->m_replaying = true;
-						}else{
-							s2efirst->m_replaying = false;
-						}
-						s2efirst->m_forkrecord4repaly = std::deque<bool>(
-								s2efirst->m_forkrecord);
-						s2efirst->m_allowserialize = false;
-					}
-				}
-				if (currentce) {
-					res.second->m_shouldbedeleted = true;
-				}
-				if (!currentce) {
-					res.first->m_shouldbedeleted = true;
-				}
-			}
-		}
     } else {
         res = Executor::fork(current, condition, isInternal);
     }

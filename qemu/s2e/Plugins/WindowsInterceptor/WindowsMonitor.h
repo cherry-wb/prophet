@@ -252,7 +252,7 @@ class WindowsMonitorState:public PluginState
 {
 private:
     uint64_t m_CurrentPid;
-
+    ModuleDescriptor::MDSet m_LoadedLibraries;
 public:
     WindowsMonitorState();
     virtual ~WindowsMonitorState();
@@ -260,6 +260,7 @@ public:
     static PluginState *factory(Plugin *p, S2EExecutionState *state);
 
     friend class WindowsMonitor;
+    friend class WindowsUmInterceptor;
 };
 
 } // namespace plugins

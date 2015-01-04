@@ -257,6 +257,12 @@ public:
 			return false;
 		}
     }
+    bool getTaintMode(){
+    	return this->taintMode;
+    }
+    void setTaintMode(bool _taintMode){
+       this->taintMode = _taintMode;
+     }
 
 	void setParalForkOnSymbolicAddress(bool paralForkOnSymbolicAddress);
 

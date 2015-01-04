@@ -123,7 +123,6 @@ void ModuleExecutionDetector::initializeConfiguration()
     ConfigFile *cfg = s2e()->getConfig();
 
     m_mainmodule = cfg->getString(getConfigKey() + ".mainmodule");
-	m_mainmoduleIndentity = 0;
 	if (m_mainmodule.length() == 0) {
 		s2e()->getWarningsStream()
 				<< "ModuleExecutionDetector: You must specify mainmodule to track" << '\n';
@@ -323,7 +322,14 @@ void ModuleExecutionDetector::onCustomInstruction(
 }
 
 
-
+uint64_t ModuleExecutionDetector::getMainmoduleIndentity(S2EExecutionState *state) const {
+  DECLARE_PLUGINSTATE(ModuleTransitionState, state);
+	return		   plgState->m_mainmoduleIndentity;
+}
+void ModuleExecutionDetector::setMainmoduleIndentity(uint64_t mainmoduleIndentity,S2EExecutionState *state) {
+   DECLARE_PLUGINSTATE(ModuleTransitionState, state);
+   plgState->m_mainmoduleIndentity = mainmoduleIndentity;
+}
 /*****************************************************************************/
 /*****************************************************************************/
 /*****************************************************************************/
@@ -341,26 +347,29 @@ void ModuleExecutionDetector::moduleLoadListener(
 
     const std::string *s = getModuleId(module);
 	if (!isKernelMode()) {
-		if (s  && m_mainmodule == *s && m_mainmoduleIndentity == 0) {//  //允许多进程，以最后一个进程为主进程 ,通过跳过参数m_skipprocessnum进行设置
-			m_mainmoduleIndentity = module.Pid;
+		if (s  && m_mainmodule == *s && plgState->m_mainmoduleIndentity == 0) {//  //允许多进程，以最后一个进程为主进程 ,通过跳过参数m_skipprocessnum进行设置
+			 plgState->m_mainmoduleIndentity = module.Pid;
 			std::stringstream ss;
 			ss << "ModuleExecutionDetector mainmodule：" << m_mainmodule << "PID:"
-					<< hexval(m_mainmoduleIndentity);
+					<< hexval( plgState->m_mainmoduleIndentity);
 			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"mainmoduleload",ss.str());
 			tb_need_flash = 1;
-		} else if (s && m_mainmoduleIndentity == 0 && m_mainmodule != *s) {
+		} else if (s &&  plgState->m_mainmoduleIndentity == 0 && m_mainmodule != *s) {
+//			fprintf(stderr,"1\n");
 			return; //主模块加载之前不要加载任何其他附加模块
-		} else if (m_mainmoduleIndentity != 0 && module.Pid != m_mainmoduleIndentity) {
+		} else if ( plgState->m_mainmoduleIndentity != 0 && module.Pid !=  plgState->m_mainmoduleIndentity) {
+//			fprintf(stderr,"2\n");
 			return; //不是作为主进程附加模块而加载的，则略过
-		}else if (m_mainmoduleIndentity == 0){
+		}else if ( plgState->m_mainmoduleIndentity == 0){
+//			fprintf(stderr,"3\n");
 			return;
 		}
 	}else{
-		if (s && m_mainmoduleIndentity == 0 && m_mainmodule == *s) {
-			m_mainmoduleIndentity = module.LoadBase;
+		if (s &&  plgState->m_mainmoduleIndentity == 0 && m_mainmodule == *s) {
+			 plgState->m_mainmoduleIndentity = module.LoadBase;
 			std::stringstream ss;
 			ss << "ModuleExecutionDetector mainmodule:" << m_mainmodule << "LoadBase:"
-					<< hexval(m_mainmoduleIndentity);
+					<< hexval( plgState->m_mainmoduleIndentity);
 			s2e()->getCorePlugin()->onNotifyMessage.emit(state,"mainmoduleload",ss.str());
 		}
 	}
@@ -726,6 +735,7 @@ ModuleTransitionState::ModuleTransitionState()
 {
     m_PreviousModule = NULL;
     m_CachedModule = NULL;
+    m_mainmoduleIndentity = 0;
 }
 
 ModuleTransitionState::~ModuleTransitionState()
@@ -763,7 +773,7 @@ ModuleTransitionState* ModuleTransitionState::clone() const
         assert(it != ret->m_Descriptors.end());
         ret->m_PreviousModule = *it;
     }
-
+    ret->m_mainmoduleIndentity = m_mainmoduleIndentity;
     return ret;
 }
 

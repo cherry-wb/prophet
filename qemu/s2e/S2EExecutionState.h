@@ -120,9 +120,12 @@ public:
     //是否正在重播，当m_forkrecord4repaly变为空时，请将其设为false
     bool m_preparingstate;
     bool m_replaying;
+    bool m_isskip;//ga 标识是否跳过对当前状态的处理
+    bool m_replay2normal;//ga 标记是否由重放转到正常执行
     bool m_allowserialize;
     bool m_forcetoadd;
     std::string m_statefilename;
+
     typedef std::set<std::pair<uint64_t,uint64_t> > OSPageNeedToSwap;
     OSPageNeedToSwap m_OSPageNeedToSwap;
 protected:
