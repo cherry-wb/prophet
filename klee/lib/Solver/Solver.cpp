@@ -61,6 +61,10 @@ namespace {
   llvm::cl::opt<bool>
   ReinstantiateSolver("reinstantiate-solver",
                       llvm::cl::init(false));
+
+  llvm::cl::opt<bool>
+  PropagateConcolics("propagate-concolics",
+                      llvm::cl::init(true));
 }
 
 /***/
@@ -78,6 +82,7 @@ Solver::~Solver() {
 }
 
 SolverImpl::~SolverImpl() {
+delete readEvaluator;
 }
 const char* SolverImpl::getOperationStatusString(SolverRunStatus statusCode)
 {
@@ -913,6 +918,15 @@ STPSolverImpl::computeInitialValues(const Query &query,
          ie = query.constraints.end(); it != ie; ++it)
     vc_assertFormula(vc, builder->construct(*it));
 
+	std::map<const Array*, std::set<int> > related;
+  if(PropagateConcolics){
+	std::vector<ref<Expr> >::const_iterator it = query.constraints.begin();
+	while (it != query.constraints.end()) {
+		scanreadexpr(*it, related);
+		it++;
+	}
+  }
+
   ++stats::queries;
   ++stats::queryCounterexamples;
 
@@ -952,8 +966,21 @@ STPSolverImpl::computeInitialValues(const Query &query,
   }
 
   if (success) {
-    if (hasSolution)
+    if (hasSolution){
+    	 if(PropagateConcolics){
+    		 for (unsigned i=0; i<objects.size(); ++i) {
+				std::set<int> symbpos = related[objects[i]];
+				for(unsigned ai = 0 ;ai < objects[i]->size; ai++){
+					if(symbpos.find(ai) == symbpos.end()){
+						values[i][ai] =  objects[i]->concreteBuffer[ai];
+					}else{
+						continue;
+					}
+				}
+        	}
+    	 }
       ++stats::queriesInvalid;
+    }
     else
       ++stats::queriesValid;
   }
@@ -966,7 +993,19 @@ STPSolverImpl::computeInitialValues(const Query &query,
 SolverImpl::SolverRunStatus STPSolverImpl::getOperationStatusCode() {
    return runStatusCode;
 }
-
+void SolverImpl::scanreadexpr(const ref<Expr> &e, std::map<const Array*, std::set<int> > &related) {
+  if (!isa<klee::ConstantExpr>(e)) {
+      Expr *ep = e.get();
+      for (unsigned i=0; i<ep->getNumKids(); i++)
+    	  scanreadexpr(ep->getKid(i),related);
+      if (const ReadExpr *re = dyn_cast<ReadExpr>(e)) {
+    	  ref<Expr> v = readEvaluator->visit(re->index);
+    	  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(v)) {
+    		  related[re->updates.root].insert(CE->getZExtValue());
+    	  }
+      }
+  }
+}
 #ifdef SUPPORT_METASMT
 
 // ------------------------------------- MetaSMTSolverImpl class declaration ------------------------------

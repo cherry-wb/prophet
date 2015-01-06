@@ -75,6 +75,13 @@ public:
 
     void initialize();
 
+    const char* getDefaultBaseDir(){
+    	if(m_baseDirectories.size()>0){
+    		return m_baseDirectories[0].c_str();
+    	}
+    	return "";
+    }
+
 private:
     //bool m_allowWrite;
     std::vector<std::string> m_baseDirectories;

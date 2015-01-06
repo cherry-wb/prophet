@@ -57,7 +57,7 @@ extern "C" {
 namespace s2e {
 namespace plugins {
 
-S2E_DEFINE_PLUGIN(HostFiles, "Access to host files", "",);
+S2E_DEFINE_PLUGIN(HostFiles, "Access to host files", "HostFiles",);
 
 void HostFiles::initialize()
 {

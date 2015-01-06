@@ -11,21 +11,35 @@
 #define KLEE_SOLVERIMPL_H
 
 #include <vector>
-
+#include <map>
+#include "klee/util/ExprEvaluator.h"
 namespace klee {
   class Array;
   class ExecutionState;
   class Expr;
+  class ExprEvaluator;
   struct Query;
 
   /// SolverImpl - Abstract base clase for solver implementations.
+  class ReadEvaluator : public ExprEvaluator {
+     protected:
+       ref<Expr> getInitialValue(const Array &mo, unsigned index) {
+       	if(mo.concreteBuffer.size()>0){
+       		return klee::ConstantExpr::alloc(mo.concreteBuffer.at(index), Expr::Int8);
+       	}else{
+       		 return klee::ConstantExpr::alloc(0, Expr::Int8);
+       	}
+       }
+     public:
+       ReadEvaluator() {}
+     };
   class SolverImpl {
     // DO NOT IMPLEMENT.
     SolverImpl(const SolverImpl&);
     void operator=(const SolverImpl&);
     
   public:
-    SolverImpl() {}
+    SolverImpl() {readEvaluator = new ReadEvaluator;}
     virtual ~SolverImpl();
 
     enum SolverRunStatus { SOLVER_RUN_STATUS_SUCCESS_SOLVABLE,
@@ -78,7 +92,8 @@ namespace klee {
     }
 
     virtual void setCoreSolverTimeout(double timeout) {};
-
+    ReadEvaluator* readEvaluator;
+    void scanreadexpr(const ref<Expr> &e, std::map<const Array*,std::set<int> > &related);
 };
 
 }

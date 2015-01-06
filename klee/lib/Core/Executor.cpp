@@ -965,7 +965,41 @@ bool Executor::resolveSpeculativeState(ExecutionState &state)
     }
 
     //Add the concrete values to the current state
+    //state.concolics.clear();
+    //遍历所有的约束条件,将读取数组的表达式挑选出来,其他的就是自由变量,将其设置为初始化值
+//	std::vector<ref<Expr> >::const_iterator it = state.constraints.begin();
+//	std::map<const Array*, std::set<int> > related;
+//	while (it != state.constraints.end()) {
+//		scanreadexpr(*it, related);
+//		it++;
+//	}
+	//debug
+//	std::map<const Array*, std::set<int> >::const_iterator cit =
+//			related.begin();
+//	while (cit != related.end()) {
+//		fprintf(stderr, "%s:\n", ((*cit).first)->name.c_str());
+//		std::set<int>::const_iterator pit = (*cit).second.begin();
+//		while (pit != (*cit).second.end()) {
+//			fprintf(stderr, "%d:", (*pit));
+//			pit++;
+//		}
+//		fprintf(stderr, "\n");
+//		cit++;
+//	}
     for (unsigned i=0; i<symbObjects.size(); ++i) {
+//    	std::set<int> symbpos = related[symbObjects[i]];
+//    	for(unsigned ai = 0 ;ai < symbObjects[i]->size; ai++){
+//    		if(symbpos.find(ai) == symbpos.end()){
+//    			concreteObjects[i][ai] =  symbObjects[i]->concreteBuffer[ai];
+//    		}else{
+//    			fprintf(stderr, "%d:", ai);
+//    			continue;
+//    		}
+//    	}
+//    	fprintf(stderr, "\n");
+//    	for(int k = 0 ; k< concreteObjects[i].size();k++){
+//    		fprintf(stderr, "%c", concreteObjects[i][k]);
+//    	}
         state.concolics.add(symbObjects[i], concreteObjects[i]);
     }
 

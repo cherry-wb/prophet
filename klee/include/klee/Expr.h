@@ -599,7 +599,14 @@ public:
 
   // FIXME: This does not belong here.
   mutable void *stpInitialArray;
-
+  //cherry
+  std::vector<unsigned char> concreteBuffer;
+  bool hasconcreteBuffer() const {
+	  if(concreteBuffer.size() == this->size)
+		  return true;
+	  else
+		  return false;
+  }
 public:
   /// Array - Construct a new array object.
   ///
@@ -608,21 +615,30 @@ public:
   /// when printing expressions. When expressions are printed the output will
   /// not parse correctly since two arrays with the same name cannot be
   /// distinguished once printed.
-  Array(const std::string &_name, uint64_t _size, 
-        const ref<ConstantExpr> *constantValuesBegin = 0,
-        const ref<ConstantExpr> *constantValuesEnd = 0)
+  Array(const std::string &_name, uint64_t _size,  std::vector<unsigned char> inbuff,const ref<ConstantExpr> *constantValuesBegin = 0,
+          const ref<ConstantExpr> *constantValuesEnd = 0)
     : name(_name), size(_size), 
-      constantValues(constantValuesBegin, constantValuesEnd), 
+      constantValues(constantValuesBegin, constantValuesEnd),
       stpInitialArray(0) {
     assert((isSymbolicArray() || constantValues.size() == size) &&
            "Invalid size for constant array!");
-#ifdef NDEBUG
-    for (const ref<ConstantExpr> *it = constantValuesBegin;
-         it != constantValuesEnd; ++it)
-      assert(it->getWidth() == getRange() &&
-             "Invalid initial constant value!");
-#endif
+    concreteBuffer = std::vector<unsigned char>(inbuff);
   }
+  Array(const std::string &_name, uint64_t _size,
+          const ref<ConstantExpr> *constantValuesBegin = 0,
+          const ref<ConstantExpr> *constantValuesEnd = 0)
+      : name(_name), size(_size),
+        constantValues(constantValuesBegin, constantValuesEnd),
+        stpInitialArray(0) {
+      assert((isSymbolicArray() || constantValues.size() == size) &&
+             "Invalid size for constant array!");
+  #ifdef NDEBUG
+      for (const ref<ConstantExpr> *it = constantValuesBegin;
+           it != constantValuesEnd; ++it)
+        assert(it->getWidth() == getRange() &&
+               "Invalid initial constant value!");
+  #endif
+    }
   ~Array();
 
   bool isSymbolicArray() const { return constantValues.empty(); }

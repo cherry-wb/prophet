@@ -2354,7 +2354,7 @@ S2EExecutor::StatePair S2EExecutor::fork(ExecutionState &current,
 			if (VerboseFork) {
 				llvm::raw_ostream& out = m_s2e->getMessagesStream(s2ecurrent);
 				out << "May Fork state " << s2ecurrent->getID() << " at pc = "
-						<< hexval(s2ecurrent->getPc()) << '\n';
+						<< hexval(s2ecurrent->getPc()) << (ce->isTrue() ? "True":"False") <<'\n';
 				out << "    state " << s2ecurrent->getID() << " with condition "
 						<< selectcondition << '\n';
 			}

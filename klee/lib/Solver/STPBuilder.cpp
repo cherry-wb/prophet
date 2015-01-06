@@ -386,6 +386,20 @@ ExprHandle STPBuilder::constructSDivByConstant(ExprHandle expr_n, unsigned width
 
 ::VCExpr STPBuilder::getInitialArray(const Array *root) {
   if (root->stpInitialArray) {
+//	  if(root->hasconcreteBuffer()){//将初始值考虑进来,方便进行真实符号执行
+//			vc_DeleteExpr( root->stpInitialArray);
+//			char buf[256];
+//			snprintf(buf, sizeof(buf), "%s_%p", root->name.c_str(), (void*) root);
+//			root->stpInitialArray = buildArray(buf, 32, 8);
+//		  for (unsigned i = 0, e = root->size; i != e; ++i) {
+//			::VCExpr prev = root->stpInitialArray;
+//			root->stpInitialArray =
+//			  vc_writeExpr(vc, prev,
+//						   construct(ConstantExpr::alloc(i, root->getDomain()), 0),
+//						   construct(ConstantExpr::alloc(root->concreteBuffer[i], root->getRange()), 0));
+//			vc_DeleteExpr(prev);
+//		  }
+//	  }
     return root->stpInitialArray;
   } else {
     // STP uniques arrays by name, so we make sure the name is unique by
@@ -407,6 +421,16 @@ ExprHandle STPBuilder::constructSDivByConstant(ExprHandle expr_n, unsigned width
         vc_DeleteExpr(prev);
       }
     }
+//    else if(root->hasconcreteBuffer()){//将初始值考虑进来,方便进行真实符号执行
+//        for (unsigned i = 0, e = root->size; i != e; ++i) {
+//          ::VCExpr prev = root->stpInitialArray;
+//          root->stpInitialArray =
+//            vc_writeExpr(vc, prev,
+//                         construct(ConstantExpr::alloc(i, root->getDomain()), 0),
+//                         construct(ConstantExpr::alloc(root->concreteBuffer[i], root->getRange()), 0));
+//          vc_DeleteExpr(prev);
+//        }
+//    }
 
     return root->stpInitialArray;
   }

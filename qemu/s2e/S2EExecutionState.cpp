@@ -1588,7 +1588,7 @@ ref<Expr> S2EExecutionState::createConcolicValue(
     assert((bufferSize == bytes || bufferSize == 0)  &&
            "Concrete buffer must either have the same size as the expression or be empty");
 
-    const Array *array = new Array(sname, bytes);
+    const Array *array = new Array(sname, bytes, buffer);
 
     MemoryObject *mo = new MemoryObject(0, bytes, false, false, false, NULL);
     mo->setName(sname);
@@ -1597,17 +1597,15 @@ ref<Expr> S2EExecutionState::createConcolicValue(
 
     if (bufferSize == bytes) {
         if (ConcolicMode) {
-            concolics.add(array, buffer);
+            concolics.add(array,  buffer);
         } else {
             g_s2e->getWarningsStream(this)
                     << "Concolic mode disabled: ignoring concrete assignments for " << name << '\n';
-
         }
     }
 
     return  Expr::createTempRead(array, width);
 }
-
 
 ref<Expr> S2EExecutionState::createSymbolicValue(
             const std::string& name, Expr::Width width)
@@ -1633,7 +1631,7 @@ std::vector<ref<Expr> > S2EExecutionState::createConcolicArray(
     assert(concreteBuffer.size() == size || concreteBuffer.size() == 0);
 
     std::string sname = getUniqueVarName(name);
-    const Array *array = new Array(sname, size);
+    const Array *array = new Array(sname, size, concreteBuffer);
 
     UpdateList ul(array, 0);
 
@@ -1659,7 +1657,6 @@ std::vector<ref<Expr> > S2EExecutionState::createConcolicArray(
         } else {
             g_s2e->getWarningsStream(this)
                     << "Concolic mode disabled: ignoring concrete assignments for " << name << '\n';
-
         }
     }
 

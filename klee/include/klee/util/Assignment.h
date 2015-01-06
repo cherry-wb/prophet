@@ -11,7 +11,7 @@
 #define KLEE_UTIL_ASSIGNMENT_H
 
 #include <map>
-
+#include <stdio.h>
 #include "klee/util/ExprEvaluator.h"
 
 // FIXME: Rename?
@@ -77,7 +77,9 @@ namespace klee {
   inline ref<Expr> Assignment::evaluate(const Array *array, 
                                         unsigned index) const {
     bindings_ty::const_iterator it = bindings.find(array);
+//    fprintf(stderr,"evaluate %s index %d :",array->name.c_str(), index);//CHECK
     if (it!=bindings.end() && index<it->second.size()) {
+//      fprintf(stderr,"%c\n",it->second[index]);//CHECK
       return ConstantExpr::alloc(it->second[index], Expr::Int8);
     } else {
       if (allowFreeValues) {
