@@ -60,7 +60,7 @@ extern CPUArchState *env;
 #include <s2e/S2EExecutor.h>
 #include <s2e/Plugin.h>
 #include <s2e/Utils.h>
-
+#include <s2e/Plugins/CorePlugin.h>
 #include <klee/Context.h>
 #include <klee/Memory.h>
 #include <klee/Solver.h>
@@ -2230,7 +2230,7 @@ void S2EExecutionState::addConstraint(klee::ref<klee::Expr> e)
         }
         assert(res && !truth  &&  "state has invalid constraint set");
     }
-
+    g_s2e->getCorePlugin()->onaddConstraint.emit(this, e);
     constraints.addConstraint(e);
 }
 

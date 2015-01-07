@@ -218,6 +218,11 @@ public:
                  const klee::ref<klee::Expr> & /* condition */>
             onTaintFork;
 
+    /*   for  analysis Constraint*/
+    sigc::signal<void, S2EExecutionState* /* currentstate */,
+                 const klee::ref<klee::Expr> & /* constraint */>
+            onaddConstraint;
+
     sigc::signal<void,
                  S2EExecutionState*, /* currentState */
                  S2EExecutionState*> /* nextState */
