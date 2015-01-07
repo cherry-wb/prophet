@@ -364,6 +364,12 @@ public:
          * S2E finished all states.
      */
     sigc::signal<void>  onAllStateKilled;
+
+    /*   for  analysis memory read and write, listener should check the write or read attribute.*/
+    sigc::signal<void, S2EExecutionState* /* currentstate */,
+                 const klee::ref<klee::Expr> & /* address */>
+            onSymbolicRW;
+
 };
 
 } // namespace s2e

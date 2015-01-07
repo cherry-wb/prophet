@@ -572,11 +572,11 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
 
         concreteAddress = value;
     }
-
+    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    s2eExecutor->m_s2e->getCorePlugin()->onSymbolicRW.emit(s2eState, address);
     klee::ref<klee::Expr> condition = EqExpr::create(concreteAddress, address);
 
     if (!state->forkDisabled) {
-    	S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
     	if(g_s2e_paral_fork_on_symbolic_address){
     		if(s2eState->m_replaying){
     				bool currentce = s2eState->m_forkrecord4repaly.front();
