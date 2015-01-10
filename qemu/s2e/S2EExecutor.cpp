@@ -551,6 +551,8 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
     }
 
     klee::ref<klee::Expr> concreteAddress;
+    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
+    s2eExecutor->m_s2e->getCorePlugin()->onSymbolicRW.emit(s2eState, address);
 
     if (ConcolicMode) {//ConcolicMode = TaintMode
     	  //为了获取符号化的地址，我们将这里的address保存到当前的state中，以便于出现内存访问或其他需要的时候拿到未具体化的符号地址用于分析。
@@ -572,8 +574,7 @@ void S2EExecutor::handleForkAndConcretize(Executor* executor,
 
         concreteAddress = value;
     }
-    S2EExecutionState* s2eState = static_cast<S2EExecutionState*>(state);
-    s2eExecutor->m_s2e->getCorePlugin()->onSymbolicRW.emit(s2eState, address);
+
     klee::ref<klee::Expr> condition = EqExpr::create(concreteAddress, address);
 
     if (!state->forkDisabled) {

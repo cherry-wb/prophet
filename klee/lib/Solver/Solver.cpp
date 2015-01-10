@@ -925,6 +925,7 @@ STPSolverImpl::computeInitialValues(const Query &query,
 		scanreadexpr(*it, related);
 		it++;
 	}
+	scanreadexpr(query.expr, related);
   }
 
   ++stats::queries;
@@ -1000,9 +1001,45 @@ void SolverImpl::scanreadexpr(const ref<Expr> &e, std::map<const Array*, std::se
     	  scanreadexpr(ep->getKid(i),related);
       if (const ReadExpr *re = dyn_cast<ReadExpr>(e)) {
     	  ref<Expr> v = readEvaluator->visit(re->index);
-    	  if (ConstantExpr *CE = dyn_cast<ConstantExpr>(v)) {
-    		  related[re->updates.root].insert(CE->getZExtValue());
-    	  }
+    	  klee::Expr::Width  rw= re->getWidth();
+			if (klee::ConstantExpr *CE = dyn_cast<klee::ConstantExpr>(v)) {
+				switch(rw){
+				case klee::Expr::Int8 :
+					related[re->updates.root].insert(CE->getZExtValue());
+					break;
+				case klee::Expr::Int16 :
+					related[re->updates.root].insert(CE->getZExtValue());
+					related[re->updates.root].insert(CE->getZExtValue()+1);
+					break;
+				case klee::Expr::Int32 :
+					related[re->updates.root].insert(CE->getZExtValue());
+					related[re->updates.root].insert(CE->getZExtValue()+1);
+					related[re->updates.root].insert(CE->getZExtValue()+2);
+					related[re->updates.root].insert(CE->getZExtValue()+3);
+					break;
+				case klee::Expr::Int48 :
+					related[re->updates.root].insert(CE->getZExtValue());
+					related[re->updates.root].insert(CE->getZExtValue()+1);
+					related[re->updates.root].insert(CE->getZExtValue()+2);
+					related[re->updates.root].insert(CE->getZExtValue()+3);
+					related[re->updates.root].insert(CE->getZExtValue()+4);
+					related[re->updates.root].insert(CE->getZExtValue()+5);
+					break;
+				case klee::Expr::Int64 :
+					related[re->updates.root].insert(CE->getZExtValue());
+					related[re->updates.root].insert(CE->getZExtValue()+1);
+					related[re->updates.root].insert(CE->getZExtValue()+2);
+					related[re->updates.root].insert(CE->getZExtValue()+3);
+					related[re->updates.root].insert(CE->getZExtValue()+4);
+					related[re->updates.root].insert(CE->getZExtValue()+5);
+					related[re->updates.root].insert(CE->getZExtValue()+6);
+					related[re->updates.root].insert(CE->getZExtValue()+7);
+					break;
+				default:
+					related[re->updates.root].insert(CE->getZExtValue());
+					break;
+				}
+			}
       }
   }
 }
