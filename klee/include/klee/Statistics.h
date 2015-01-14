@@ -62,6 +62,7 @@ namespace klee {
     
     void registerStatistic(Statistic &s);
     void incrementStatistic(Statistic &s, uint64_t addend);
+    void setStatistic(Statistic &s, uint64_t addend);
     uint64_t getValue(const Statistic &s) const;
     void incrementIndexedValue(const Statistic &s, unsigned index, 
                                uint64_t addend) const;
@@ -84,7 +85,17 @@ namespace klee {
       }
     }
   }
-
+  inline void StatisticManager::setStatistic(Statistic &s,
+                                                   uint64_t value) {
+    if (enabled) {
+      globalStats[s.id] = value;
+      if (indexedStats) {
+        indexedStats[index*stats.size() + s.id] = value;
+        if (contextStats)
+          contextStats->data[s.id] = value;
+      }
+    }
+  }
   inline StatisticRecord *StatisticManager::getContext() {
     return contextStats;
   }

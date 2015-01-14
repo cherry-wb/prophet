@@ -20,7 +20,7 @@
 
 #include <iostream>
 #include <sstream>
-
+#include <stdio.h>
 using namespace klee;
 using namespace llvm;
 
@@ -308,24 +308,26 @@ std::string Expr::getstring() const {
 
 ref<Expr> ConstantExpr::fromMemory(void *address, Width width) {
   switch (width) {
-  default: assert(0 && "invalid type");
+  default: {fprintf(stderr,"[ERROR] invalid width %d", width);assert(0 && "invalid type");break;}
   case  Expr::Bool: return ConstantExpr::create(*(( uint8_t*) address), width);
   case  Expr::Int8: return ConstantExpr::create(*(( uint8_t*) address), width);
   case Expr::Int16: return ConstantExpr::create(*((uint16_t*) address), width);
   case Expr::Int32: return ConstantExpr::create(*((uint32_t*) address), width);
   case Expr::Int64: return ConstantExpr::create(*((uint64_t*) address), width);
+  case Expr::Int128:return ConstantExpr::alloc(llvm::APInt(width, (width+llvm::integerPartWidth-1)/llvm::integerPartWidth,   (const uint64_t*)address));
     // FIXME: Should support long double, at least.
   }
 }
 
 void ConstantExpr::toMemory(void *address) {
   switch (getWidth()) {
-  default: assert(0 && "invalid type");
+  default: {fprintf(stderr,"[ERROR] invalid width %d", getWidth());assert(0 && "invalid type");break;}
   case  Expr::Bool: *(( uint8_t*) address) = getZExtValue(1); break;
   case  Expr::Int8: *(( uint8_t*) address) = getZExtValue(8); break;
   case Expr::Int16: *((uint16_t*) address) = getZExtValue(16); break;
   case Expr::Int32: *((uint32_t*) address) = getZExtValue(32); break;
   case Expr::Int64: *((uint64_t*) address) = getZExtValue(64); break;
+  case Expr::Int128: memcpy(address,value.getRawData(),128);//*((long double*) address) = *(const long double*) value.getRawData();break;
     // FIXME: Should support long double, at least.
   }
 }

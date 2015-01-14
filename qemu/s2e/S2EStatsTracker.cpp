@@ -35,6 +35,7 @@
 
 #include "S2EStatsTracker.h"
 
+#include <s2e/S2E.h>
 #include <s2e/S2EExecutor.h>
 #include <s2e/S2EExecutionState.h>
 
@@ -74,6 +75,8 @@ namespace stats {
 
     Statistic concreteModeTime("ConcreteModeTime", "ConcModeTime");
     Statistic symbolicModeTime("SymbolicModeTime", "SymbModeTime");
+
+    Statistic totalStatesNum("totalStatesNum", "NumStates");
 } // namespace stats
 } // namespace klee
 
@@ -143,7 +146,7 @@ void S2EStatsTracker::writeStatsHeader() {
              //<< "'FullBranches',"
              //<< "'PartialBranches',"
              //<< "'NumBranches',"
-             << "('NumStates',"
+             << "('CurrentNumStates',"
              << "'NumQueries',"
              << "'NumQueryConstructs',"
              << "'NumObjects',"
@@ -165,6 +168,7 @@ void S2EStatsTracker::writeStatsHeader() {
              << "'ForkTime',"
              << "'ResolveTime',"
              << "'MemoryUsage',"
+             << "'NumStates',"
              << ")\n";
   statsFile->flush();
 }
@@ -174,7 +178,7 @@ void S2EStatsTracker::writeStatsLine() {
              //<< "," << fullBranches
              //<< "," << partialBranches
              //<< "," << numBranches
-             << "(" << executor.getStatesCount()
+             << "(" <<executor.getStatesCount()
              << "," << stats::queries
              << "," << stats::queryConstructs
              << "," << 0 // was numObjects
@@ -196,6 +200,7 @@ void S2EStatsTracker::writeStatsLine() {
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
              << "," << getProcessMemoryUsage() //sys::Process::GetTotalMemoryUsage()
+            << "," << stats::totalStatesNum
              << ")\n";
   statsFile->flush();
 }
@@ -242,6 +247,9 @@ S2EStateStats::S2EStateStats():
 
 void S2EStateStats::updateStats(S2EExecutionState* state)
 {
+	if(stats::totalStatesNum < state->getID()){
+		stats::totalStatesNum = state->getID();
+	}
     //Updating translation block counts
     uint64_t tbcdiff = m_statTranslationBlockConcrete - m_laststatTranslationBlockConcrete;
     stats::translationBlocksConcrete += tbcdiff;
