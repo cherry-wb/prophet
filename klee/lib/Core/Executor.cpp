@@ -325,7 +325,9 @@ Solver *constructSolverChain(Solver *stpSolver,
   if (UseQueryPCLog)
     solver = createPCLoggingSolver(solver, 
                                    queryPCLogPath);
-  
+
+  solver = createPreProcessSolver(solver);
+
   return solver;
 }
 

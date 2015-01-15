@@ -942,6 +942,10 @@ STPSolverImpl::computeInitialValues(const Query &query,
         g_solverLog->flush();
         *g_solverLog << "==============END=============" << '\n';
         free(buf);
+    }else{
+    	// only doing this, we can avoid some errors?
+    	buf = vc_printSMTLIB(vc, stp_e);
+    	free(buf);
     }
     //fprintf(stderr, "note: STP query: %.*s\n", (unsigned) len, buf);
   }
