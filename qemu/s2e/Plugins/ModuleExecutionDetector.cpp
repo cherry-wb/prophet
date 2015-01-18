@@ -121,7 +121,7 @@ void ModuleExecutionDetector::initialize()
 void ModuleExecutionDetector::initializeConfiguration()
 {
     ConfigFile *cfg = s2e()->getConfig();
-
+	m_skipprocessnum = cfg->getInt(getConfigKey() + ".skipprocessnum", 0);
     m_mainmodule = cfg->getString(getConfigKey() + ".mainmodule");
 	if (m_mainmodule.length() == 0) {
 		s2e()->getWarningsStream()
@@ -139,7 +139,7 @@ void ModuleExecutionDetector::initializeConfiguration()
     m_ConfigureAllModules = cfg->getBool(getConfigKey() + ".configureAllModules");
     //m_checkPacker = cfg->getBool(getConfigKey() + ".checkPacker",false);
     foreach2(it, keyList.begin(), keyList.end()) {
-        if (*it == "trackAllModules"  || *it == "configureAllModules" || *it == "mainmodule"|| *it == "checkPacker") {
+        if (*it == "trackAllModules"  || *it == "configureAllModules" || *it == "mainmodule"|| *it == "checkPacker" || *it == "skipprocessnum") {
             continue;
         }
 
@@ -343,11 +343,16 @@ void ModuleExecutionDetector::moduleLoadListener(
     //If module name matches the configured ones, activate.
     s2e()->getDebugStream() << "ModuleExecutionDetector: " <<
             "Module "  << module.Name <<" PID "  << hexval(module.Pid) << " loaded - " <<
-            "Base=" <<  hexval(module.LoadBase) << " Size=" << hexval(module.Size);
+            "Base=" <<  hexval(module.LoadBase) << " Size=" << hexval(module.Size) <<
+            " NativeBase=" <<  hexval(module.NativeBase) << "\n";
 
     const std::string *s = getModuleId(module);
 	if (!isKernelMode()) {
 		if (s  && m_mainmodule == *s && plgState->m_mainmoduleIndentity == 0) {//  //允许多进程，以最后一个进程为主进程 ,通过跳过参数m_skipprocessnum进行设置
+			if(plgState->m_skipprocessnum < m_skipprocessnum){
+				plgState->m_skipprocessnum += 1;
+				return;
+			}
 			 plgState->m_mainmoduleIndentity = module.Pid;
 			std::stringstream ss;
 			ss << "ModuleExecutionDetector mainmodule：" << m_mainmodule << "PID:"
@@ -736,6 +741,7 @@ ModuleTransitionState::ModuleTransitionState()
     m_PreviousModule = NULL;
     m_CachedModule = NULL;
     m_mainmoduleIndentity = 0;
+    m_skipprocessnum = 0;
 }
 
 ModuleTransitionState::~ModuleTransitionState()

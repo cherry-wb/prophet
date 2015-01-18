@@ -58,8 +58,10 @@ ObjectState *AddressSpace::getWriteable(const MemoryObject *mo,
   if (cowKey==os->copyOnWriteOwner) {
     return const_cast<ObjectState*>(os);
   } else {
-    ObjectState *n = new ObjectState(*os);
+    // fprintf(stderr,"oldobj.size=%d\n", os->size);
+	  ObjectState *n = new ObjectState(*os);
     n->copyOnWriteOwner = cowKey;
+    //fprintf(stderr,"newobj.size=%d\n", os->size);
 
     assert(state);
     state->addressSpaceChange(mo, os, n);

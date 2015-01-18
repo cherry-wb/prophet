@@ -437,12 +437,13 @@ ExecutionState* S2EExecutionState::clone(bool cestatus)
     m_cpuSystemObject = addressSpace.getWriteable(
                             m_cpuSystemState, m_cpuSystemObject);
 
+//    fprintf(stderr,"+retid=%d currentid=%d dirtyMaskObject.size=%d\n", ret->getID(),getID()  ,m_dirtyMaskObject->size);
     ret->m_dirtyMaskObject = ret->addressSpace.getWriteable(
             m_dirtyMask, m_dirtyMaskObject);
 
     m_dirtyMaskObject = addressSpace.getWriteable(
             m_dirtyMask, m_dirtyMaskObject);
-
+ //    fprintf(stderr,"-retid=%d currentid=%d dirtyMaskObject.size=%d ret->m_dirtyMaskObject.size=%d \n", ret->getID(),getID()  ,m_dirtyMaskObject->size,ret->m_dirtyMaskObject->size);
     return ret;
 }
 

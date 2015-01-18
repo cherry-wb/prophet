@@ -165,6 +165,7 @@ private:
     ConfiguredModulesById m_ConfiguredModulesId;
     ConfiguredModulesByName m_ConfiguredModulesName;
     std::string m_mainmodule;
+    uint64_t m_skipprocessnum;//有的软件设计为 地一个进程为监控进程，第二个进程才是真正的服务进程，因此需要跳过对第一个进程的监控,这里用来记录配置,而state里用来记录已跳过次数
 
     bool m_TrackAllModules;
     bool m_ConfigureAllModules;
@@ -270,6 +271,7 @@ private:
     DescriptorSet m_Descriptors;
     DescriptorSet m_NotTrackedDescriptors;
     uint64_t  m_mainmoduleIndentity;
+    uint64_t m_skipprocessnum;//有的软件设计为 地一个进程为监控进程，第二个进程才是真正的服务进程，因此需要跳过对第一个进程的监控
 
     const ModuleDescriptor *getDescriptor(uint64_t pid, uint64_t pc, bool tracked=true) const;
     bool loadDescriptor(const ModuleDescriptor &desc, bool track);

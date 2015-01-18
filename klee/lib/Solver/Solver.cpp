@@ -1001,6 +1001,7 @@ SolverImpl::SolverRunStatus STPSolverImpl::getOperationStatusCode() {
 void SolverImpl::scanreadexpr(const ref<Expr> &e, std::map<const Array*, std::set<int> > &related) {
   if (!isa<klee::ConstantExpr>(e)) {
       Expr *ep = e.get();
+      //fprintf(stderr,"%s\n",ep->getstring().c_str());
       for (unsigned i=0; i<ep->getNumKids(); i++)
     	  scanreadexpr(ep->getKid(i),related);
       if (const ReadExpr *re = dyn_cast<ReadExpr>(e)) {
