@@ -4452,7 +4452,7 @@ if test "x$ac_cv_header_stp_c_interface_h" = x""yes; then :
 
 else
 
-         as_fn_error "Unable to use stp/c_interface.h header" "$LINENO" 5
+         as_fn_error "Unable to use -I$stp_root/include/stp/c_interface.h header" "$LINENO" 5
 
 fi
 

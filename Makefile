@@ -41,7 +41,8 @@ JOBS := $(shell grep -c ^processor /proc/cpuinfo)
 endif
 MAKE = make -j$(JOBS)
 
-all: all-release guest-tools
+#guest-tools
+all: all-release
 
 guest-tools: stamps/guest-tools32-make stamps/guest-tools64-make
 
@@ -195,6 +196,7 @@ stamps/stp-configure: CONFIGURE_COMMAND = scripts/configure $(STP_CONFIGURE_FLAG
 
 #STP: concurrent build is not reliable
 stamps/stp-make: stamps/stp-configure
+	cd stp/include/stp && rm c_interface.h && ln -s ../../src/c_interface/c_interface.h  c_interface.h
 	cd stp && make
 	mkdir -p stamps && touch $@
 
@@ -205,6 +207,7 @@ stamps/stp-asan-configure: stamps/llvm-native-make
 stamps/stp-asan-configure: CONFIGURE_COMMAND = scripts/configure $(STP_CONFIGURE_FLAGS) --with-address-sanitizer
 
 stamps/stp-asan-make: stamps/stp-asan-configure
+	cd stp/include/stp && rm c_interface.h && ln -s ../../src/c_interface/c_interface.h  c_interface.h
 	cd stp-asan && make
 	mkdir -p stamps && touch $@
 
