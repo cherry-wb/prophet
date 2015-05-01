@@ -2967,7 +2967,7 @@ void s2e_dump_testcase(S2E *s2e,S2EExecutionState *state) {
 		for (unsigned i = 0; i < vp.second.size(); ++i) {
 			ss << std::setw(2) << std::setfill('0') << (unsigned) vp.second[i]
 					<< ' '
-					<< (vp.second[i] >= 0x20 ? (char) vp.second[i] : ' ');
+					<< (vp.second[i] >= 0x20 ? (char) vp.second[i] : ' ') << ' ';
 		}
 		ss << std::setfill(' ') << '\n';
 	}
