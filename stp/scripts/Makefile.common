@@ -11,9 +11,9 @@
 -include $(TOP)/scripts/config.info
 
 # use -march=native if it works correctly (it's broken in GCC on OS X)
-ifeq ($(shell $(CXX) -march=native -E - < /dev/null >/dev/null 2>&1 && echo 1),1)
-    OPTIMIZE_MARCH_NATIVE = -march=native
-endif
+#ifeq ($(shell $(CXX) -march=native -E - < /dev/null >/dev/null 2>&1 && echo 1),1)
+#    OPTIMIZE_MARCH_NATIVE = -march=native
+#endif
 
 # Optimization
 OPTIMIZE      = -fPIC -O3 -DNDEBUG -fomit-frame-pointer $(OPTIMIZE_MARCH_NATIVE)
